@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
   try {
     const { error } = await client.supabase.auth.verifyOtp({ token_hash: token, type });
     if (error) return client.finish(authRedirect("/auth/error?reason=expired"));
-    return client.finish(authRedirect(type === "recovery" ? "/reset-password" : "/settings/profile"));
+    if (type === "signup") {
+      const enrollment = await client.supabase.rpc("re_ensure_account");
+      if (enrollment.error) return client.finish(authRedirect("/auth/error?reason=unavailable"));
+    }
+    return client.finish(authRedirect(type === "recovery" ? "/reset-password" : "/me"));
   } catch {
     return client.finish(authRedirect("/auth/error?reason=unavailable"));
   }

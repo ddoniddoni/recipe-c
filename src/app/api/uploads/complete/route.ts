@@ -22,14 +22,14 @@ export async function POST(request: NextRequest) {
     if (!member) return finish(recipeError("UNAUTHENTICATED"), 401);
     const admin = createMediaAdminClient();
     if (!admin) return finish(recipeError("UNAVAILABLE"), 503);
-    const { data, error } = await context.supabase.rpc("claim_recipe_upload", { p_asset_id: input.assetId });
+    const { data, error } = await context.supabase.rpc("re_claim_recipe_upload", { p_asset_id: input.assetId });
     if (error) return finish(recipeDbError(error), 400);
     const claim = claimSchema.parse(data);
     const originalPath = `originals/${member.profile_id}/${claim.id}`;
     const removeOriginal = async () => {
       // Failed cleanup is retryable and does not pretend to have succeeded.
-      const removed = await admin.storage.from("recipe-media").remove([originalPath]);
-      if (!removed.error) await admin.from("media_assets").update({ original_removed_at: new Date().toISOString() })
+      const removed = await admin.storage.from("re_recipe_media").remove([originalPath]);
+      if (!removed.error) await admin.from("re_media_assets").update({ original_removed_at: new Date().toISOString() })
         .eq("id", claim.id).eq("owner_id", member.profile_id).eq("status", "ready");
     };
     if (claim.status === "ready") {
@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
     }
     if (!claim.token) return finish(recipeError("INTERNAL_ERROR"), 503);
     const token = claim.token;
-    const complete = (result: { [key: string]: string | number }) => admin.rpc("finish_recipe_upload", {
+    const complete = (result: { [key: string]: string | number }) => admin.rpc("re_finish_recipe_upload", {
       p_asset_id: claim.id, p_owner_id: member.profile_id, p_token: token, p_result: result,
     });
     try {
-      const original = await admin.storage.from("recipe-media").download(originalPath);
+      const original = await admin.storage.from("re_recipe_media").download(originalPath);
       if (original.error || !original.data) {
         await complete({ status: "pending", errorCode: "UPLOAD_MISSING" });
         return finish({ ok: false, code: "UPLOAD_MISSING", message: "원본 업로드를 확인하지 못했어요. 같은 사진으로 업로드를 다시 시도해 주세요." }, 409);
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       const output = await processRecipeImage(Buffer.from(await original.data.arrayBuffer()));
       // Attempt-specific paths prevent an expired worker replacing a retry's bytes.
       const processedPath = `processed/${member.profile_id}/${claim.id}/${token}.webp`;
-      const uploaded = await admin.storage.from("recipe-media").upload(processedPath, output.bytes, {
+      const uploaded = await admin.storage.from("re_recipe_media").upload(processedPath, output.bytes, {
         contentType: "image/webp", upsert: false, cacheControl: "0",
       });
       if (uploaded.error) throw new Error("STORAGE_FAILED");

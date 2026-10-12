@@ -11,7 +11,12 @@ export async function GET(request: NextRequest) {
   try {
     const { error } = await client.supabase.auth.exchangeCodeForSession(code);
     if (error) return client.finish(authRedirect("/auth/error?reason=expired"));
-    return client.finish(authRedirect(safeNextPath(request.nextUrl.searchParams.get("next"), "/settings/profile")));
+    const destination = safeNextPath(request.nextUrl.searchParams.get("next"), "/me");
+    if (destination !== "/reset-password") {
+      const enrollment = await client.supabase.rpc("re_ensure_account");
+      if (enrollment.error) return client.finish(authRedirect("/auth/error?reason=unavailable"));
+    }
+    return client.finish(authRedirect(destination));
   } catch {
     return client.finish(authRedirect("/auth/error?reason=unavailable"));
   }

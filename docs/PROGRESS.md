@@ -4,10 +4,10 @@
 
 ## 현재 상태
 
-**P0 기반 구현과 검증 완료. P1 인증·권한 코드는 develop에 통합했으며 P2 레시피·미디어 UI/서버/마이그레이션 코드를 작성했다. 사용자의 2026-10-12 지시에 따라 테스트·린트·타입 검사·빌드·브라우저 검증은 별도 요청까지 보류한다. Supabase 연결은 밤으로 미뤘으며 실제 연결과 DB/Storage 적용은 하지 않았다. P1/P2 완료나 동작 검증 통과를 의미하지 않는다.**
+**P0 기반 구현과 검증 완료. P1 인증·권한과 P2 레시피·미디어 코드는 develop에 통합했다. P3 후기·커뮤니티 UI/서버/마이그레이션 코드를 작업 브랜치에 작성했다. 사용자의 테스트·린트·타입 검사·빌드·브라우저 검증 보류 지시를 유지한다. Supabase 연결과 DB/Storage 적용도 재개 요청까지 보류한다. P1/P2/P3 동작·보안 검증 통과나 단계 완료를 의미하지 않는다.**
 
-현재 단계: P2 레시피·미디어 코드 작성. P1/P2 외부 연결 대기 / 검증 보류
-다음 작업: 밤에 기존 개발용 Supabase의 스키마·Auth·Storage 연결을 재개한다. 검증은 별도 재개 요청 이후
+현재 단계: P3 후기·커뮤니티 코드 작성 / 연결 대기 / 검증 보류. P1/P2 develop 통합 / 외부 연결 대기 / 검증 보류
+다음 작업: 사용자 요청에 따라 P3 Git Flow 또는 P4 월간 어워즈. Supabase 연결과 검증은 별도 재개 요청 이후
 서비스명: 레시피 어워즈, 가칭
 확정 스택: Next.js, Supabase, npm
 
@@ -19,7 +19,7 @@
 | P0 기반 | 완료 | 홈/탐색/상세 개발 샘플, 토큰/공통 상태, 환경 검증, 38개 테스트 및 build 통과 |
 | P1 인증/권한 | 코드 작성 / 연결 대기 / 검증 보류 | 이메일 Auth, 계정 매핑, RLS, 프로필. 실행 검사는 사용자 요청까지 보류 |
 | P2 레시피/이미지 | 코드 작성 / 연결 대기 / 검증 보류 | 초안, 불변 버전, 사진 처리, 검색/상세/조리 보기. 실제 동작 미검증 |
-| P3 후기/커뮤니티 | 미시작 | 별점, 사진 후기, 댓글, 북마크, 알림 |
+| P3 후기/커뮤니티 | 코드 작성 / 연결 대기 / 검증 보류 | 버전별 사진 후기·통계, 북마크, 댓글·답글, 알림, 신고 접수. 실제 동작 미검증 |
 | P4 어워즈 | 미시작 | 월간 출품, 평가, 안전한 결과 확정 |
 | P5 공개 베타 | 미시작 | 운영, 신고, 탈퇴, SEO, 전체 검증 |
 | P6-A 제휴 | 보류 | 베타 검증과 제휴 승인 이후 |
@@ -286,3 +286,95 @@ export PATH="/Users/ddoni/Documents/Codex/2026-10-12/new-chat/work/runtime/node_
 - 테스트·lint·typecheck·build·DB/E2E·audit·React Doctor·브라우저 검증 보류 지시를 유지한다. PR에도 모든 실행 검증 미실행과 Supabase 미연결·migration 미적용을 명시한다.
 - 이번 반영은 코드 통합이다. 실제 기능/보안 검증 완료 또는 배포 준비 완료를 뜻하지 않는다. Supabase 연결과 원격 DB/Storage 변경, main 릴리스와 배포는 수행하지 않는다.
 - 이후 새 기능은 최신 develop에서 새 작업 브랜치로 시작한다. Supabase 연결·검증은 사용자 재개 요청에 따라 진행한다.
+
+## P3 시작 — 2026-10-13 (KST)
+
+- P2 PR #2 병합 커밋 `1377422`의 최신 develop에서 `feature/p3-community`를 생성했다.
+- 범위: 버전별 사진 후기와 평점, 북마크, 댓글·한 단계 답글, 앱 내 알림, 신고 접수, 현재 버전 통계와 정렬, 내 저장/후기 목록.
+- UI → 사용자 세션 RPC → DB 제약/RLS를 작성한다. P4 월간 평가와 P5 관리자 신고 처리는 이번 범위 밖이다.
+- 사용자 지시에 따라 테스트 작성/실행, lint/typecheck/build/DB/E2E/브라우저 검증, Supabase 연결·migration 적용은 보류한다. 이번 개발 요청에 commit/push/PR/병합/배포는 포함되지 않는다.
+
+## P3 후기·커뮤니티 코드 작성 — 2026-10-13 (KST)
+
+### 구현과 변경 파일
+
+- `src/features/community/`: 입력/조회 계약, 사용자 세션 Server Action, 요청별 조회, 버전별 후기 편집과 사진 1~3장/별점 1~5 입력, 댓글 분류와 한 단계 답글, 신고 접수, 북마크, 내 후기/저장/신고 상태, 알림 읽음 처리를 작성했다. 글은 React 텍스트로 출력하고 실패/충돌 때 입력을 유지한다. 명시적인 최신 내용 불러오기는 입력 소실 확인을 거친다.
+- 상세에는 보고 있는 버전의 실제 평균과 후기 수, 모든 버전 후기의 버전 표시, 레시피 작성자 댓글 표시를 연결했다. 카드 안의 저장 버튼은 상세 링크 밖에 배치했다. 프로필에는 공개 후기, 홈에는 현재 버전에 최근 후기가 달린 레시피를 추가했다.
+- `src/app/(member)/notifications/page.tsx`, `/me` 탭: 본인 알림 12개씩 조회/페이지 읽음, 비공개 저장 목록, 본인 후기 published/hidden/deleted 상태 및 신고 접수 상태. 숨김/삭제된 대상 알림에는 내용과 링크가 없고, 볼 수 없는 저장 항목은 해제할 수 있다.
+- `src/features/media/components/image-uploader.tsx`, `/api/uploads/sign`: 후기 목적/발행 버전으로 사진 예약을 분기하고 P2의 이미지 바이트 검사와 처리 경로를 공유한다. 레시피/후기 사진을 서로 바꾸어 사용할 수 없도록 DB 소유자·목적·버전 검사를 작성했다.
+- `supabase/migrations/20261012154218_community.sql`: CLI로 만든 미적용 migration. 후기·사진 참조·댓글·북마크·알림·신고와 FK/UQ/RLS/명시적 grants, 제한된 쓰기 RPC, 사진 목적 확장, 현재 버전 통계/공개 조회를 작성했다. 비공개 저장자 목록과 공개 저장 수를 분리하며 일반 사용자 직접 쓰기를 허용하지 않는다.
+- `src/features/recipes/`와 `src/lib/supabase/database.ts`: 실제 평점/후기/저장 수와 최신/보정 평점/후기 수/저장 수 정렬. DB 타입은 실행 중인 스키마에서 생성하지 않은 수작업 계약이다. `docs/02`, `docs/04`에 변경 계약과 연결 절차를 반영했다.
+
+### 주요 결정
+
+- 후기 생성/편집/삭제를 하나의 private DB 함수로 모았다. 삭제 후에도 사용자+버전 UNIQUE를 유지하고 동일 행을 복원한다. revision과 request ID/입력 hash로 경합과 중복 요청을 처리한다. 댓글은 고정 ID를 재사용하며 같은 방식으로 재시도를 처리한다.
+- 통계는 버전별 공개 후기의 SECURITY INVOKER view로 읽는다. 후기/북마크 원본을 다중 JOIN하지 않고 각각 집계한다. 일반 정렬 보정식은 C=3.5, m=5이며 월간 어워즈 참여/결과를 의미하지 않는다.
+- 후기와 답글 알림은 글쓰기와 같은 DB 트랜잭션에서 event_key UNIQUE로 생성하며 본문을 복제하지 않는다. 신고 대상은 nullable FK 세 개 중 하나만 허용하고 본인의 중복 미처리 신고는 기존 접수 ID를 반환한다.
+- 기존 UI 색·글꼴·공통 컴포넌트를 유지하면서 후기의 버전/점수/사진과 대화의 깊이를 구분했다. 사진 업로드 준비가 안 된 환경에서는 새 사진을 올릴 수 없으며 저장 성공을 흉내 내지 않는다.
+
+### 실행 상태와 남은 작업
+
+- 실행한 작업: Git fetch/fast-forward 기준 확인/새 작업 브랜치, CLI migration new 도움말과 파일 생성, 소스 작성과 Git 변경 목록 읽기. 패키지 설치·의존성 변경 없음. commit/push/PR/병합/배포 없음.
+- 설치된 Next.js data-security 가이드와 [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [DB 함수](https://supabase.com/docs/guides/database/functions), [변경 기록](https://supabase.com/changelog)을 참고했다. changelog.md는 도구가 Markdown 응답을 지원하지 않아 일반 페이지로 읽었다. 사용자 지시가 스킬의 실행 검증 권고보다 우선하므로 React Doctor/DB advisor도 실행하지 않았다.
+- **테스트 작성·실행, lint, typecheck, build, DB/E2E, audit, React Doctor, 브라우저 검증: NOT RUN — 사용자 지시.** SQL 실행과 실제 이미지/세션/요청 결과를 확인하지 않았다. P0 통과 기록은 이번 기능의 근거가 아니다.
+- Supabase 연결과 migration 3개 적용은 보류다. 연결 재개 시 기존 객체 충돌, PostgreSQL 버전, Auth/Storage/SMTP 설정과 타입 생성을 확인해야 한다. 실행하지 않은 코드의 SQL/타입/권한/동시성/렌더링 오류 가능성이 남아 있다.
+- P4는 후기 변경 함수 내부에 행사 잠금·서버 시각·평가 snapshot/source_revision 갱신을 추가한다. P5는 관리자 신고 처리·숨김/복구·탈퇴·파일 정리/영구 삭제를 추가한다. 이번에는 운영 기능이나 월간 평가를 가짜로 연결하지 않았다.
+
+## 공유 Supabase 접두사 적용 — 2026-10-13 (KST)
+
+- 사용자가 `.env.local`에 Supabase 값을 입력했으며 해당 프로젝트는 다른 앱과 공유한다고 알렸다. 이 앱 테이블에 `re_` 접두사를 사용하라는 지시를 현재 P3 작업에 반영했다. 환경 파일은 읽어 출력하거나 변경하지 않았다.
+- 아직 미적용인 P1/P2/P3 migration의 앱 테이블을 모두 re_ 이름으로 수정하고 FK/RLS/조회/함수 내부 참조를 맞췄다. 공개 뷰·RPC·인덱스·제약·정책도 접두사를 적용했다. 내부 객체는 `re_private.re_*`, 버킷은 `re_recipe_media`를 사용한다. 클라이언트 from/rpc 호출과 TypeScript 계약, 운영 SQL 예제, AGENTS 규칙을 함께 변경했다.
+- 공유 public 스키마의 기본 권한 변경과 기존 private 스키마 사용을 제거했다. 앱 전용 스키마가 이미 있으면 초기 migration이 중단되므로 기존 객체를 자동 인수하지 않는다. auth/storage 시스템 테이블 이름은 유지했다.
+- 기존의 전체 Auth 사용자 backfill과 전역 Auth 생성 트리거를 제거하고 `re_ensure_account`를 로그인/가입 확인 경로에 연결했다. DB에서 현재 사용자·실제 세션·이메일 확인을 재검사하며 본인만 생성한다. 앱 전용 advisory lock으로 중복 등록을 직렬화하고 role은 항상 기본 member로 시작한다.
+- 실제 원격 DB 조회/적용, 서버 실행, 테스트 작성/실행, lint/typecheck/build/DB/E2E/React Doctor는 하지 않았다. `.env.local` 입력은 연결 검증 완료가 아니다. Auth 자체는 공유하므로 전역 비밀번호·메일·계정 삭제 설정은 별도 앱처럼 분리된 것으로 취급하지 않는다.
+- Git 변경은 기존 P3 브랜치에 유지한다. commit/push/PR/병합은 이번 요청 범위에 없으며 실행하지 않았다. 연결 재개 시 공유 migration 이력과 re_ 객체 충돌부터 확인한다. P5 탈퇴 계약도 앱 데이터 정리와 공유 Auth 전체 삭제를 분리하도록 정정했다.
+
+## 원격 DB 적용 연결 준비 — 2026-10-13 (KST)
+
+- 사용자가 원격 DB 적용을 요청하고 `.env.local`의 프로젝트 `mwepkrdlvdreoojrqegr`를 대상으로 지정했다. 환경 파일의 비밀값은 출력하거나 변경하지 않았다.
+- 기존 Supabase MCP는 다른 프로젝트를 가리켰다. 사용자 지시에 따라 로컬 Codex 설정의 Supabase MCP URL에서 프로젝트 참조만 대상 프로젝트로 변경했다. CLI 조회 결과 해당 프로젝트, enabled=true, auth_status=o_auth를 확인했다. 서버의 비인증 연결은 HTTP 401로 응답했다.
+- 현재 대화 런타임에는 Supabase MCP 도구가 노출되지 않아 원격 스키마 조회·migration 적용은 아직 수행하지 못했다. MCP 도구를 다시 불러온 세션에서 대상 확인 → 기존 이력/객체 충돌 확인 → 앱 migration 적용 → 생성 객체 확인 순서로 이어간다. 다른 앱의 객체나 migration 이력은 수정하지 않는다.
+- 테스트·lint·typecheck·build·DB/E2E·audit·React Doctor·브라우저 QA 보류 지시를 유지한다. commit/push/PR/병합 없음.
+
+## 원격 DB 적용 재개 — 2026-10-13 (KST)
+
+- MCP 재인증과 사용자 리로드 후 `get_project_url`이 `.env.local`과 같은 `mwepkrdlvdreoojrqegr`를 반환했다.
+- 적용 전 조회: PostgreSQL 17.6, 타 앱 public 테이블 14개와 migration 이력 14개. `re_private`, public `re_` 객체/함수/정책 및 `re_recipe_media` 버킷은 없으며 필요한 Auth 열이 존재한다.
+- P1/P2/P3를 MCP로 순서대로 적용하고 생성 객체와 기존 공유 객체의 정의/권한 보존 여부를 확인한다. 기능/권한 테스트와 앱 검증 명령은 계속 보류한다.
+
+### 적용 결과
+
+- MCP `apply_migration` 3건 모두 `success: true`. 원격 이력에 기록된 버전과 로컬 파일명을 일치시켰다. 예전 파일명은 위 개발 기록에만 남긴다.
+  - `20261012081353_auth_foundation.sql` → `20261012170253_re_auth_foundation.sql`
+  - `20261012140254_recipes_media.sql` → `20261012170300_re_recipes_media.sql`
+  - `20261012154218_community.sql` → `20261012170309_re_community.sql`
+- 적용 후 카탈로그 조회: public 앱 테이블 13개와 re_private 테이블 3개 모두 RLS 활성화, 공개 뷰 4개 모두 security_invoker=true, public 앱 함수 29개 중 SECURITY DEFINER 0개. 분류 9개만 등록됐으며 앱 계정은 0개로 기존 Auth 사용자 일괄 등록 없음.
+- `re_recipe_media`: private, 5MiB, JPEG/PNG/WebP. 이 버킷의 anon/authenticated 직접 접근만 막는 restrictive 정책을 확인했다.
+- 기존 migration 14건이 그대로 남아 있고 앱 이력 3건만 추가됐다. 기존 public 객체의 RLS/ACL, public 함수 소스/ACL, public/auth/storage 기존 정책 표현식, public/전역 기본 권한, Auth 트리거 정의를 모아 계산한 적용 전후 fingerprint가 동일했다. 타 앱 사용자 데이터는 조회하거나 변경하지 않았다.
+- `.env.local`은 기존 키 값을 유지하면서 변수 이름만 앱이 읽는 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`로 맞췄다. 비밀값을 출력하지 않았으며 Git에 포함하지 않는다.
+- 변경 파일: migration 3개(원격 버전으로 이름 정렬), `docs/04_DELIVERY_AND_TESTS.md`, 이 진행 기록. 기존 기능 변경은 현재 P3 브랜치에 보존했다.
+- **테스트·lint·typecheck·build·DB/E2E·audit·React Doctor·DB advisor·브라우저 QA 및 타입 생성: NOT RUN — 사용자 보류 지시.** 이번 확인은 원격 적용과 객체 생성 확인이며 기능/권한 테스트 통과를 뜻하지 않는다.
+- 남은 작업: 공유 Auth callback/메일 설정 확인, 실제 로그인·업로드·커뮤니티 흐름 및 권한 검증, 수작업 DB 타입의 생성본 전환. 전역 Auth/메일/SMTP 설정은 수정하지 않았다. commit/push/PR/병합/앱 배포 없음.
+
+## 가입 흐름 간소화 시작 — 2026-10-13 (KST)
+
+- 사용자 요청: 이메일·이름·비밀번호만 입력하고 가입 시 이메일 확인 절차를 생략한다. 현재 미완료인 P3/원격 연결 작업의 가입 흐름을 이어 수정한다.
+- 공유 Auth의 전역 설정을 바꾸지 않고 서버에서 새 사용자만 자동 확인 상태로 생성한다. 기존 Auth 사용자의 확인 상태·비밀번호·metadata는 수정하지 않는다. 가입 후 입력한 이름과 자동 handle로 앱 프로필을 준비하고 바로 로그인한다.
+- 서버 전용 가입 경로에는 DB 요청 제한을 추가한다. 사용자 세션 검사·RLS·소유권 검사는 유지하며, 테스트/빌드 보류와 기존 미커밋 변경 보존 지시를 유지한다.
+
+### 가입 간소화 반영 결과
+
+- `schemas.ts`, `auth-form.tsx`, 가입 페이지: 이메일·이름(2~30자)·비밀번호(기존 12~128자) 세 입력만 제공한다. 가입 버튼과 안내를 변경하고 확인 메일 재발송 메뉴/액션을 제거했다. `/verify-email`의 기존 링크는 로그인으로 이동한다.
+- `signup-service.ts`, `actions.ts`: 서버 전용 키로 새 Auth 사용자만 `email_confirm: true` 생성 → 사용자 세션 로그인 → 본인 `re_ensure_account` → `/me`. 기존 주소의 계정은 자동 확인/비밀번호 변경하지 않는다. 생성 이후 로그인·프로필 처리가 실패하면 가입 완료와 재로그인 안내를 구분한다. 비밀번호 복구는 유지한다.
+- `20261012171637_re_simple_signup.sql`: 입력한 이름과 자동 handle을 사용해 프로필을 완성하고 추가 입력 단계를 생략한다. 표시용 metadata는 검증 후 이름에만 사용한다. 가입 요청 한도는 앱 전체 30회/시간, 이메일 HMAC별 3회/시간이며 service_role 전용 RPC로 제한한다. 공유 Auth 설정, 기존 사용자, 타 앱 객체는 변경하지 않는다.
+- 같은 개발 프로젝트에 migration 적용 결과 `success: true`. 기록된 원격 버전으로 로컬 파일명을 정렬하고 적용 SQL과 동일함을 확인했다. DB 카탈로그에서 가입 제한 RPC의 anon/authenticated 실행 권한 없음, service_role 실행 가능, 계정 준비 함수 갱신을 확인했다. 실제 가입 계정은 만들지 않았으며 앱 계정 수는 0개다.
+- 계정 화면에서 이메일 소유권을 검증했다는 문구를 제거하고 `.env.example`, AGENTS 및 제품/아키텍처/설치 문서를 갱신했다. [Supabase createUser 공식 문서](https://supabase.com/docs/reference/javascript/auth-admin-createuser)와 설치된 Next.js Server Function 가이드를 참고했다.
+- **테스트 작성/실행·lint·typecheck·build·DB/E2E·React Doctor·브라우저 검증: NOT RUN — 사용자 지시.** 코드 읽기와 적용 메타데이터만 확인했다. 실제 새 가입·중복 가입·부분 성공 재로그인·요청 제한 동작은 미검증이다. commit/push/PR/병합/앱 배포 없음.
+- 다음 확인은 사용자 재개 요청 시 실제 가입과 로그인 흐름이다. 기존 공유 Auth의 미확인 계정은 기존 서비스에서 처리해야 하며 이번 가입 경로가 자동 인수하지 않는다. 가입 요청 한도는 초기 개발 기준으로, 공개 운영 전 조정할 수 있다.
+
+## P3 및 연결 작업 Git Flow 반영 — 2026-10-13 (KST)
+
+- 사용자 요청으로 `feature/p3-community`의 변경을 커밋·푸시하고 develop 대상 PR 생성·병합·로컬 develop 동기화를 진행한다. 범위는 P3 커뮤니티, 공유 Supabase의 re_ 이름 적용과 원격 migration 기록, 간소화한 신규 가입 흐름이다.
+- 원격 fetch 후 현재 HEAD와 origin/develop이 `1377422`로 일치하고 해당 기능 브랜치의 기존 PR이 없음을 확인했다. 로컬 환경 파일은 Git 무시 대상으로 유지한다.
+- 기존 테스트 보류 지시를 유지한다. lint/typecheck/test/build/DB/E2E/React Doctor는 실행하지 않으며 PR에 NOT RUN으로 명시한다. 기존 원격 적용 및 DB 카탈로그 확인 기록은 기능 테스트 통과를 뜻하지 않는다.
+- 이번 Git Flow는 develop 코드 통합이며 main 릴리스나 앱 배포는 포함하지 않는다. 병합 후 develop에서 마친다.

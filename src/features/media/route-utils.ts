@@ -31,7 +31,7 @@ export async function readMediaRequest(request: NextRequest): Promise<unknown> {
 export async function mediaMember(context: NonNullable<ReturnType<typeof createSupabaseRouteClient>>) {
   const { data, error } = await context.supabase.auth.getUser();
   if (error || !data.user || data.user.is_anonymous) return null;
-  const account = await context.supabase.rpc("get_my_account");
+  const account = await context.supabase.rpc("re_get_my_account");
   const member = account.data?.[0];
   if (account.error || !member || member.status !== "active" || !member.email_verified || !member.profile_completed) return null;
   return member;

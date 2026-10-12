@@ -76,6 +76,7 @@ export const recipeCardSchema = z.object({
   id: uuidSchema, versionId: uuidSchema, versionNo: z.number().int(), title: z.string(),
   summary: z.string(), servings: z.number(), minutes: z.number(),
   difficulty: z.enum(["easy", "medium", "hard"]), category: z.string(), coverAssetId: uuidSchema,
+  reviewCount: z.number().int().nonnegative(), averageRating: z.number().nullable(), bookmarkCount: z.number().int().nonnegative(), saved: z.boolean(),
   authorId: uuidSchema, author: z.string(), handle: z.string(), publishedAt: z.string(),
 });
 export type PublishedRecipeCard = z.infer<typeof recipeCardSchema>;

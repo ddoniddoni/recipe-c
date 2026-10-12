@@ -69,6 +69,23 @@ npm install sharp
 
 패키지 추가 후 peer dependency 경고를 검토하고 잠금 파일을 하나만 유지한다. 정상적인 npm 설치에 --force나 --legacy-peer-deps를 기본 옵션으로 쓰지 않는다. 테스트와 빌드가 깨졌다고 기존 의존성 전체를 무차별 업데이트하지 않는다.
 
+### 공유 Supabase의 이름과 적용 범위
+
+- 사용자 제공 `.env.local`은 값 출력·문서 복사·커밋 없이 로컬에서만 사용한다. 값이 입력되어 있어도 migration 적용과 연결 성공을 뜻하지 않는다.
+- 모든 레시피 앱 테이블/뷰/RPC는 `re_` 접두사, 비공개 스키마는 `re_private`, 버킷은 `re_recipe_media`다. 기존 다른 앱의 profiles/recipes/accounts나 private 스키마를 사용하거나 rename하지 않는다.
+- P1/P2/P3 migration을 처음 적용하기 전에 이 규칙으로 수정했고, 지정된 개발 프로젝트에 2026-10-13(KST) 적용했다. 이미 예전 migration을 다른 환경에 적용했다면 그대로 재실행하지 말고 그 환경의 실제 앱 객체만 대상으로 별도 전환 migration을 준비한다.
+- 공유 프로젝트에서는 전체 DB reset, migration repair, remote schema pull을 자동 실행하지 않는다. 적용 전 기존 Supabase migration 이력과 앱 전용 이름 충돌을 확인하고 기존 앱의 migration까지 이 저장소가 소유한다고 간주하지 않는다.
+- 원격 이력에는 타 앱 migration 14개가 함께 있다. 이 저장소만으로 전체 `db push`를 실행하거나 빠진 타 앱 이력을 repair하지 않는다. 현재 앱 migration은 MCP `apply_migration`으로 각각 적용했으며 로컬 파일명을 MCP가 기록한 실제 버전과 맞췄다. 후속 적용도 기존 이력을 보존하고 해당 앱의 새 migration만 대상으로 한다.
+- public 스키마의 default privileges 변경, auth.users 트리거, 전체 Auth 사용자 backfill은 이 앱 초기화에서 제외한다. config.toml과 이메일 템플릿은 로컬 개발 설정이며 공유 원격 Auth 설정에 덮어씌우지 않는다. 로그인·가입 확인에서 본인의 `re_ensure_account`만 호출한다.
+
+### P3 후기·커뮤니티 연결 시 추가할 사항
+
+- P1/P2 다음에 `20261012170309_re_community.sql`을 적용한다. 지정된 개발 프로젝트에는 적용됐으며, 다른 환경에서는 기존 후기·댓글·북마크·알림·신고 객체와 충돌 여부를 먼저 확인한다.
+- P3는 기존 media_assets 목적 제약과 claim/finish 함수, recipe_cards/get_recipe_detail 읽기 계약을 확장한다. search_recipes의 기존 6인자 함수를 7인자(끝에 p_sort 기본값)로 교체하므로 스키마 반영과 앱 코드 배포를 함께 계획한다. 아바타 목적은 허용하지 않는다.
+- 새 환경변수/패키지는 없다. 후기 사진도 P2의 private 버킷과 서버 전용 파일 처리 키를 사용한다. 일반 후기·댓글·신고 요청은 사용자 세션으로만 처리한다.
+- 검증 재개 시 SOCIAL-01~07과 REC-08, MEDIA-03/04, SEC-04/06/08을 우선 실행한다. 추가로 같은 요청 재시도, 편집 중 다른 액션의 새로고침, 동일 버전 후기 동시 생성/삭제 후 복원, 목적/버전이 다른 사진 주입, 삭제/숨김 원댓글, 신고 중복 접수, 타인 알림 읽음, 비공개 저장 목록과 공개 저장 수의 분리를 확인한다.
+- DB 타입은 수작업 계약이다. 연결 후 생성본으로 교체하고 anon/authenticated 역할과 여러 사용자 세션으로 권한을 확인해야 한다. 이번에는 테스트를 작성하거나 실행하지 않았다.
+
 ## 3. npm 스크립트 계약
 
 다음 명령 이름을 준비한다. 각 스크립트의 실제 구현과 필요한 환경은 해당 단계에서 추가한다. 없는 명령을 문서만 보고 실행 완료로 기록하지 않는다.
@@ -98,29 +115,31 @@ DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과�
 
 ## 4. Supabase 개발 환경
 
-### 현재 작업의 연결·검증 방침 (2026-10-12)
+### 현재 작업의 연결·검증 방침 (2026-10-13)
 
-사용자는 P1에서 **기존 개발용 Supabase 프로젝트**를 사용하기로 선택했다. 프로젝트 URL/ID와 `.env.local` 연결 값은 아직 확인되지 않았다. 로컬 설정은 선택 가능한 보조 환경으로 준비하되 Docker 실행, 원격 DB 변경, Auth 설정 변경을 수행했다고 간주하지 않는다.
+사용자는 **기존 개발용 Supabase 프로젝트** `mwepkrdlvdreoojrqegr`에 원격 적용을 요청했다. MCP의 프로젝트 URL과 `.env.local` 대상이 일치함을 확인했고, P1/P2/P3 migration을 순서대로 적용했다. 공유 Auth 설정은 변경하지 않았다. DB 적용 확인은 실제 가입·로그인·파일 업로드의 동작 확인을 의미하지 않는다.
 
-또한 사용자 지시로 **테스트, lint, typecheck, build, audit, React Doctor, DB advisor, 브라우저 검증은 별도 요청까지 실행하지 않는다.** 아래 검증 목록은 향후 재개할 때의 기준이며 이번 구현의 통과 기록이 아니다. 새 P1/P2 테스트 작성도 보류한다. Supabase 연결은 사용자가 밤에 재개하기로 했으므로, P2도 로컬 코드와 migration만 작성한다.
+또한 사용자 지시로 **테스트, lint, typecheck, build, audit, React Doctor, DB advisor, 브라우저 검증은 별도 요청까지 실행하지 않는다.** 아래 검증 목록은 향후 재개할 때의 기준이며 이번 구현의 통과 기록이 아니다. 새 P1/P2/P3 테스트 작성도 보류한다. 이번에는 적용 전 충돌 조회와 적용 후 DB 카탈로그·migration 이력 확인만 수행했다.
+
+현재 가입은 이메일·이름·비밀번호만 입력하며 확인 메일과 추가 프로필 입력을 생략한다. `20261012171637_re_simple_signup.sql`까지 원격 적용했다. `SUPABASE_SECRET_KEY`는 신규 Auth 사용자 생성에도 필요하다. 전역 Auth의 Confirm email은 다른 앱을 위해 유지하고 새 사용자에만 Admin API의 `email_confirm: true`를 사용한다. 기존 계정 확인·비밀번호를 덮어쓰지 않는다. 요청 제한은 앱 전체 30회/시간, 이메일별 3회/시간이며 실제 가입 호출 테스트는 하지 않았다.
 
 ### 기존 개발 프로젝트 연결
 
-1. 대상이 운영 DB가 아닌 개발 프로젝트임을 확인하고 기존 테이블/함수와 migration 이력을 먼저 확인한다. 이 P1 migration은 `public.profiles`, `public.categories`, `private.accounts` 등을 새로 만들므로 동명 객체가 이미 있으면 적용 전에 조정한다. 기존 Auth 사용자는 권한 메타데이터를 복사하지 않고 일반 회원으로 매핑한다. 기존 회원의 프로필/권한 정보를 덮어쓰는 통합 migration으로 사용하지 않는다.
-2. `.env.local`에 `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, 실제 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `DEMO_MODE=false`를 설정한다. P1은 secret/service-role 키를 사용하지 않는다. 실제 키를 문서나 채팅, Git에 넣지 않는다.
-3. Dashboard Auth의 Site URL은 앱과 같은 origin으로 설정한다. Redirect URLs는 `/auth/callback`, `/auth/callback?next=/reset-password`의 정확한 전체 URL만 등록한다. `localhost`와 `127.0.0.1`을 섞지 않는다. 광범위한 wildcard나 외부 사용자 입력 URL을 사용하지 않는다.
-4. 이메일/비밀번호 가입과 **이메일 확인 필수**, 비밀번호 최소 12자, secure password change를 켜고 anonymous sign-in을 끈다. 외부 개발 프로젝트에는 `supabase/config.toml`이 자동 적용되지 않으므로 이 설정과 Auth rate limit을 별도로 확인한다.
-5. 확인 메일과 복구 메일 내용에는 각각 `supabase/templates/confirmation.html`, `recovery.html`을 설정한다. `SiteURL/auth/confirm?token_hash=...&type=signup` 또는 `type=recovery`를 사용하여 서버에서 일회성 토큰을 확인한다. 실제 메일 발송은 해당 프로젝트 SMTP의 수신자 허용과 발송 제한에 달려 있다. 메일 추적에 의한 링크 변경은 끈다.
+1. 대상이 운영 DB가 아닌 개발 프로젝트임을 확인하고 기존 테이블/함수와 migration 이력을 먼저 확인한다. 이 P1 migration은 `public.re_profiles`, `public.re_categories`, `re_private.re_accounts` 등을 새로 만들므로 동명 객체가 이미 있으면 적용 전에 조정한다. 공유 Auth 사용자 일괄 매핑은 하지 않는다. 이 앱의 로그인/가입 확인에서 `re_ensure_account`를 호출한 사용자만 일반 회원으로 등록하며 사용자 metadata의 권한은 복사하지 않는다.
+2. `.env.local`에 `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, 실제 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `DEMO_MODE=false`를 설정한다. 서버 키는 신규 가입과 이미지 처리용이며 일반 회원 콘텐츠 요청은 세션 클라이언트를 쓴다. 실제 키를 문서나 채팅, Git에 넣지 않는다.
+3. 앱 전용 환경에서는 Dashboard Auth의 Site URL을 앱과 같은 origin으로 설정한다. 공유 환경에서는 기존 Site URL을 덮어쓰지 않고 앱의 정확한 callback URL 추가를 별도로 검토한다. `localhost`와 `127.0.0.1`을 섞지 않으며 광범위한 wildcard를 사용하지 않는다.
+4. 앱 전용 환경의 기준은 이메일/비밀번호 가입, **이메일 확인 필수**, 비밀번호 최소 12자, secure password change, anonymous sign-in 비활성화다. 공유 프로젝트의 전역 설정은 타 앱에 영향을 주므로 자동 변경하지 않는다. 외부 개발 프로젝트에는 `supabase/config.toml`이 자동 적용되지 않는다.
+5. 앱 전용 환경의 메일 템플릿은 `supabase/templates/confirmation.html`, `recovery.html`을 기준으로 한다. 공유 프로젝트의 템플릿과 SMTP는 이번에 변경하지 않았으며, 앱별 callback 및 확인/복구 메일 흐름은 별도 연결 확인이 필요하다.
 6. CLI 연결과 migration 적용은 대상/권한을 확인한 뒤 별도로 진행한다. `npm run supabase -- ...`는 프로젝트에 고정한 CLI를 사용하며 telemetry를 끈다. DB 적용 완료 전 UI의 설정 존재 표시를 연결 성공으로 보지 않는다.
-7. DB 적용 후 타입 생성은 `npm run db:types -- --linked`를 사용한다. 현재 `src/lib/supabase/database.ts`는 **수작업으로 작성한 P1 타입 계약**이다. 생성 스크립트는 정상 종료와 Database 타입 출력을 확인한 뒤 이 파일을 원자적으로 교체하며 실패 시 기존 파일을 보존한다. 사용자 요청 전에는 타입 생성이나 검증도 실행하지 않는다.
+7. DB 적용 후 타입 생성은 `npm run db:types -- --linked`를 사용한다. 현재 `src/lib/supabase/database.ts`는 **수작업으로 작성한 P1~P3 타입 계약**이다. 공유 프로젝트의 생성본에는 타 앱 객체도 포함되므로 앱 계약 범위를 검토한다. 생성 스크립트는 정상 종료와 Database 타입 출력을 확인한 뒤 이 파일을 원자적으로 교체하며 실패 시 기존 파일을 보존한다. 사용자 요청 전에는 타입 생성이나 검증도 실행하지 않는다.
 
-가입 → 확인 메일 → `/settings/profile` → `/me` 순서로 연결한다. 비밀번호 복구는 `/forgot-password` → 메일 → `/reset-password` → 재로그인이다. `getClaims`로 토큰을 검증하고, 계정 정보/관리자 경로에는 최신 Auth 사용자와 DB 계정 정보를 사용한다. Proxy는 쿠키 갱신과 `private, no-store` 응답 헤더를 함께 전달한다. 요청별 서버 클라이언트를 사용하며 사용자 세션을 전역 캐시에 저장하지 않는다.
+가입 → 자동 로그인/프로필 생성 → `/me` 순서로 연결한다. 비밀번호 복구는 `/forgot-password` → 메일 → `/reset-password` → 재로그인이다. `getClaims`로 토큰을 검증하고, 계정 정보/관리자 경로에는 최신 Auth 사용자와 DB 계정 정보를 사용한다. Proxy는 쿠키 갱신과 `private, no-store` 응답 헤더를 함께 전달한다. 요청별 서버 클라이언트를 사용하며 사용자 세션을 전역 캐시에 저장하지 않는다.
 
 ### P2 레시피·사진 연결 시 추가할 설정
 
-- P1 다음에 `20261012140254_recipes_media.sql`을 적용한다. 기존 `recipes`, `media_assets`, 관련 함수와 `recipe-media` 버킷이 없는지 먼저 확인한다. 이 migration은 기존 객체를 덮어쓰지 않으며, 현재는 적용하지 않았다.
-- `.env.local`의 `SUPABASE_SECRET_KEY`는 사진 서명·처리·접근에만 서버에서 사용한다. 일반 레시피/초안 쓰기는 사용자 세션의 RPC를 사용한다. 키가 없으면 편집 화면에서 사진 업로드를 안내로 대체하고 텍스트 초안만 저장할 수 있다. 키를 설정했다고 Storage 연결이 확인된 것은 아니다.
-- `recipe-media`는 private, 파일당 5MiB, JPEG/PNG/WebP만 허용한다. migration은 이 버킷에 일반 anon/authenticated 직접 접근을 막는 restrictive Storage 정책을 추가한다. 버킷을 public으로 전환하지 않는다. 서명된 원본 업로드와 서버의 처리 경로 외에는 쓰기 권한을 추가하지 않는다.
+- P1 `20261012170253_re_auth_foundation.sql` 다음에 `20261012170300_re_recipes_media.sql`을 적용한다. 지정된 개발 프로젝트에는 적용됐다. 다른 환경에서는 기존 `re_recipes`, `re_media_assets`, 관련 함수와 `re_recipe_media` 버킷이 없는지 먼저 확인한다. 이 migration은 기존 객체를 덮어쓰지 않는다.
+- `.env.local`의 `SUPABASE_SECRET_KEY`는 사진 서명·처리·접근과 신규 가입 계정 생성에 서버에서 사용한다. 일반 레시피/초안 쓰기는 사용자 세션의 RPC를 사용한다. 키가 없으면 신규 가입과 사진 업로드를 사용할 수 없다. 키를 설정했다고 Storage 연결이 확인된 것은 아니다.
+- `re_recipe_media`는 private, 파일당 5MiB, JPEG/PNG/WebP만 허용한다. migration은 이 버킷에 일반 anon/authenticated 직접 접근을 막는 restrictive Storage 정책을 추가한다. 버킷을 public으로 전환하지 않는다. 서명된 원본 업로드와 서버의 처리 경로 외에는 쓰기 권한을 추가하지 않는다.
 - 업로드 요청 Origin은 `NEXT_PUBLIC_SITE_URL`의 origin과 정확히 일치해야 한다. 브라우저에서 접속한 호스트를 Site URL과 맞춘다. 파일 바이트는 Storage에 직접 전송하며, Next.js sign/complete에는 2KiB 이하 JSON만 받는다.
 - 이미지 처리는 Node 런타임과 Sharp 0.35.5가 필요하다. 호스팅의 요청 시간·메모리 한도를 확인하고 Sharp 출력·픽셀 제한·처리 시간 제한을 실제로 검증한다. EXIF/GPS 제거, APNG/animated WebP·위장 파일 차단, 업로드 중단·서명 만료·처리 경합은 아직 실행 검증하지 않았다.
 - UI는 수동 초안 저장이다. 발행 전에 저장하고 미리보기를 연다. 저장 충돌은 입력을 보존한 채 최신 초안 다시 읽기를 안내하며 자동 덮어쓰기를 하지 않는다. 발행 결과가 불명확하면 같은 request ID로 확인하고, 공개 페이지의 과거 버전 링크는 해당 버전을 유지한다.
@@ -133,7 +152,7 @@ DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과�
 ```sql
 begin;
 with promoted as (
-  update private.accounts a set role = 'admin'
+  update re_private.re_accounts a set role = 'admin'
   from auth.users u
   where a.auth_user_id = '<verified-auth-user-id>'::uuid
     and u.id = a.auth_user_id and u.email_confirmed_at is not null
@@ -141,7 +160,7 @@ with promoted as (
     and a.role = 'member'
   returning a.profile_id
 )
-insert into private.audit_log(actor_id, action, entity_type, entity_id, reason)
+insert into re_private.re_audit_log(actor_id, action, entity_type, entity_id, reason)
 select null, 'account.admin_bootstrap', 'profile', profile_id,
   'Project owner approved initial administrator' from promoted
 returning entity_id;
@@ -187,7 +206,7 @@ A는 레시피 작성자, B와 C는 일반 평가자, U는 이메일 미확인 �
 
 ### P1. 인증과 권한 기반
 
-Supabase 로컬 설정, 첫 migration, profiles/private.accounts/categories, 계정 매핑 보조 함수, audit와 rate limit 기반을 만든다. 이메일 가입, 확인, 로그인, 로그아웃, 비밀번호 재설정, 서버 세션 갱신, 프로필 최초 설정을 연결한다.
+Supabase 로컬 설정, 첫 migration, public.re_profiles/re_private.re_accounts/public.re_categories, 계정 매핑 보조 함수, audit와 rate limit 기반을 만든다. 이메일 가입, 확인, 로그인, 로그아웃, 비밀번호 재설정, 서버 세션 갱신, 프로필 최초 설정을 연결한다.
 
 공개/회원/관리자 경계를 적용하고 기본 RLS와 함수 권한을 테스트한다. 관리자 최초 지정은 문서화한 제한된 운영 절차로 수행한다. 사용자가 role을 고르는 회원가입 필드는 만들지 않는다.
 

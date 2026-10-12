@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
 import { initialActionState, type ActionState } from "../action-state";
 
-type Mode = "login" | "signup" | "forgot" | "verify" | "reset";
+type Mode = "login" | "signup" | "forgot" | "reset";
 const labels: Record<Mode, string> = {
-  login: "로그인", signup: "확인 메일 받고 가입하기", forgot: "재설정 메일 받기", verify: "확인 메일 다시 받기", reset: "새 비밀번호 저장",
+  login: "로그인", signup: "회원가입", forgot: "재설정 메일 받기", reset: "새 비밀번호 저장",
 };
 
 export function AuthForm({ mode, action, next = "/me", notice }: {
@@ -19,6 +19,7 @@ export function AuthForm({ mode, action, next = "/me", notice }: {
 }) {
   const [state, formAction, pending] = useActionState(action, initialActionState);
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const hasPassword = mode === "login" || mode === "signup" || mode === "reset";
@@ -34,6 +35,11 @@ export function AuthForm({ mode, action, next = "/me", notice }: {
           id={`${mode}-email`} name="email" type="email" label="이메일" autoComplete="email"
           required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)}
           error={state.fieldErrors?.email} placeholder="you@example.com" autoCapitalize="none" spellCheck={false}
+        /> : null}
+        {mode === "signup" ? <TextField
+          id="signup-name" name="name" label="이름" autoComplete="name"
+          required minLength={2} maxLength={30} value={name} onChange={(event) => setName(event.target.value)}
+          error={state.fieldErrors?.name} hint="레시피와 댓글에 표시되는 이름이에요."
         /> : null}
         {hasPassword ? <TextField
           id={`${mode}-password`} name="password" type="password" label={mode === "reset" ? "새 비밀번호" : "비밀번호"}
@@ -56,7 +62,6 @@ export function AuthForm({ mode, action, next = "/me", notice }: {
       {mode === "login" ? <>
         <Link href="/signup">처음 오셨나요? 회원가입</Link>
         <Link href="/forgot-password">비밀번호를 잊었어요</Link>
-        <Link href="/verify-email">확인 메일 다시 받기</Link>
       </> : <Link href="/login">로그인으로 돌아가기</Link>}
       {mode === "reset" ? <><Link href="/forgot-password">재설정 메일 다시 받기</Link><Link href="/settings">계정 설정으로</Link></> : null}
     </div>

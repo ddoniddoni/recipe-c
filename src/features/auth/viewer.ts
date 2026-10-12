@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database";
 import { safeNextPath } from "./redirects";
 
-export type Member = Database["public"]["Functions"]["get_my_account"]["Returns"][number];
+export type Member = Database["public"]["Functions"]["re_get_my_account"]["Returns"][number];
 export type Viewer =
   | { kind: "unconfigured" | "demo" | "guest" | "unavailable" }
   | { kind: "member"; email: string; account: Member };
@@ -25,7 +25,7 @@ export const getViewer = cache(async (): Promise<Viewer> => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError?.name === "AuthRetryableFetchError") return { kind: "unavailable" };
     if (userError || !userData.user || userData.user.is_anonymous) return { kind: "guest" };
-    const { data, error: accountError } = await supabase.rpc("get_my_account");
+    const { data, error: accountError } = await supabase.rpc("re_get_my_account");
     if (accountError || !data?.[0]) return { kind: "unavailable" };
     return { kind: "member", email: userData.user.email ?? "", account: data[0] };
   } catch {
