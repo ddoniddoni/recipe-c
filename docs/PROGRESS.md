@@ -1,13 +1,13 @@
 # 진행 현황
 
-최종 갱신: 2026-10-12
+최종 갱신: 2026-10-13
 
 ## 현재 상태
 
-**P0 기반 구현과 검증 완료. P1 인증·권한 UI/서버/마이그레이션 코드를 작성했다. 사용자의 2026-10-12 지시에 따라 테스트·린트·타입 검사·빌드·브라우저 검증은 별도 요청까지 보류한다. 기존 개발용 Supabase 프로젝트의 URL/ID와 연결 설정이 없어 실제 연결과 DB 적용은 아직 하지 않았다. P1 완료나 동작 검증 통과를 의미하지 않는다.**
+**P0 기반 구현과 검증 완료. P1 인증·권한 코드는 develop에 통합했으며 P2 레시피·미디어 UI/서버/마이그레이션 코드를 작성했다. 사용자의 2026-10-12 지시에 따라 테스트·린트·타입 검사·빌드·브라우저 검증은 별도 요청까지 보류한다. Supabase 연결은 밤으로 미뤘으며 실제 연결과 DB/Storage 적용은 하지 않았다. P1/P2 완료나 동작 검증 통과를 의미하지 않는다.**
 
-현재 단계: P1 코드 작성, 외부 연결 대기 / 검증 보류
-다음 작업: 사용자가 밤에 Supabase 연동을 재개할 때 지정 개발 프로젝트의 연결 설정·기존 스키마 확인. 테스트는 별도 재개 요청 이후
+현재 단계: P2 레시피·미디어 코드 작성. P1/P2 외부 연결 대기 / 검증 보류
+다음 작업: 밤에 기존 개발용 Supabase의 스키마·Auth·Storage 연결을 재개한다. 검증은 별도 재개 요청 이후
 서비스명: 레시피 어워즈, 가칭
 확정 스택: Next.js, Supabase, npm
 
@@ -18,7 +18,7 @@
 | 문서 패키지 | 완료 | AGENTS + 제품/UI + 기술/데이터 + 어워즈/수익 + 개발/테스트 |
 | P0 기반 | 완료 | 홈/탐색/상세 개발 샘플, 토큰/공통 상태, 환경 검증, 38개 테스트 및 build 통과 |
 | P1 인증/권한 | 코드 작성 / 연결 대기 / 검증 보류 | 이메일 Auth, 계정 매핑, RLS, 프로필. 실행 검사는 사용자 요청까지 보류 |
-| P2 레시피/이미지 | 미시작 | 초안, 버전, 업로드, 검색 |
+| P2 레시피/이미지 | 코드 작성 / 연결 대기 / 검증 보류 | 초안, 불변 버전, 사진 처리, 검색/상세/조리 보기. 실제 동작 미검증 |
 | P3 후기/커뮤니티 | 미시작 | 별점, 사진 후기, 댓글, 북마크, 알림 |
 | P4 어워즈 | 미시작 | 월간 출품, 평가, 안전한 결과 확정 |
 | P5 공개 베타 | 미시작 | 운영, 신고, 탈퇴, SEO, 전체 검증 |
@@ -35,12 +35,13 @@
 | TypeScript / Tailwind | 5.9.3 strict / 4.3.3, @tailwindcss/turbopack 4.3.3 |
 | ESLint / Zod | 9.39.5 / 4.6.6 |
 | Supabase CLI / JS / SSR | 2.120.0 / 2.117.3 / 0.12.7 (P1에서 고정 설치) |
+| Sharp | 0.35.5 (P2에서 기존 설치 버전을 직접 의존성으로 고정) |
 | PostgreSQL | 기존 개발 프로젝트 버전 미확인. 로컬 config는 17, 실행하지 않음 |
 | 테스트 도구 | Vitest 5.0.3, Testing Library React 16.3.3, jest-dom 7.0.1, user-event 14.6.7, jsdom 30.1.2 |
 
 `.nvmrc`와 `.node-version`은 24.21.0, package.json engines는 Node >=24.21.0 <25 / npm >=11 <13이다. 전역 Node 설정을 변경하지 않았다. P1 Supabase 패키지는 고정 버전으로 추가하고 lockfile을 갱신했다. npm ci 재설치 검증은 P0 당시 기록이며 P1에서는 실행하지 않았다.
 
-## 기존 P0 검증 기록 (P1에는 해당하지 않음)
+## 기존 P0 검증 기록 (P1/P2에는 해당하지 않음)
 
 | 검증 | 상태 | 비고 |
 |---|---|---|
@@ -234,3 +235,54 @@ export PATH="/Users/ddoni/Documents/Codex/2026-10-12/new-chat/work/runtime/node_
 - 사용자 지정 검증 보류를 그대로 유지한다. 이번 반영에서도 테스트·lint·typecheck·build·DB/E2E·audit·React Doctor를 실행하지 않는다. PR에는 미검증 상태와 Supabase 미연동·migration 미적용을 명시한다.
 - 기존 P0와 무관한 파일, 로컬 환경 파일, 의존성 디렉터리, 빌드/테스트 산출물은 커밋에 포함하지 않는다. 새 P1 소스, 의존성 lockfile, migration, 설정 예제, 관련 문서가 반영 대상이다.
 - 이후 연동 작업은 최신 `develop`에서 새 작업 브랜치로 시작한다. 이 반영은 코드 보존과 개발 브랜치 통합이며 P1 동작 검증 완료를 뜻하지 않는다.
+
+## P2 시작 — 2026-10-12 (KST)
+
+- 사용자 요청: 다음 기능 개발. P1 PR #1 병합 커밋 `56d9b70`의 최신 develop에서 `feature/p2-recipes-media`를 생성했다.
+- 범위: 초안 생성/저장과 충돌 처리, 불변 발행 버전과 멱등성, private 사진 업로드/처리/접근, 공개 검색·상세·버전 선택·인분 조절·조리 보기, 내 레시피 목록.
+- 실제 Supabase 연결, 원격 DB/Storage 설정, 테스트 작성·실행 및 lint/typecheck/build/브라우저 검증은 계속 보류한다. 코드 작성 이후에도 연결/검증 완료라고 표시하지 않는다.
+- 이번 개발 요청은 commit/push/PR/병합/배포 요청이 아니므로 기능 브랜치의 작업 파일로 남긴다.
+
+## P2 레시피·미디어 코드 작성 — 2026-10-12 (KST)
+
+### 작성한 내용과 핵심 파일
+
+- `src/features/recipes/schemas.ts`, `actions.ts`, `queries.ts`, `result.ts`: 초안/발행 입력 계약과 사용자 세션 RPC, 안전한 오류 메시지, 요청별 목록/상세/초안 조회. 작성자·정상 계정·프로필·이메일·세션 확인은 DB 쓰기 함수에서도 수행한다.
+- `src/app/(member)/recipes/`, `src/features/recipes/components/recipe-editor.tsx`: 초안 생성, 재료/단계 추가·삭제·순서 이동, 사진 선택, 수동 저장, 권리 확인·경제적 관계 표시, 미리보기와 발행. 실패 시 입력을 유지하고 저장 충돌을 알린다. 발행 응답이 불명확하면 같은 request ID로 결과를 확인한다. 초안 GET 방문 자체로 새 행을 만들지 않는다.
+- `src/app/api/uploads/`, `src/features/media/`, `src/lib/supabase/admin.ts`, `src/app/media/[assetId]/route.ts`: private 원본의 서명 업로드, 사용자별 예약/처리 잠금, 서버 바이트 형식·5MiB·6,000px·20MP 제한, APNG/다중 프레임 거절, 방향 보정·메타데이터 제거·최대 1,600px/1MiB WebP 변환. Storage 관리 키는 서버 전용이며 일반 레시피 쓰기에 사용하지 않는다. 쿠키와 Origin 경계, JSON 2KiB 제한, 제한 시간, ready 이후 원본 삭제 재시도, 소유자/공개 참조 확인 후 60초 미디어 URL 발급을 작성했다.
+- `src/app/(public)/`, `src/app/(member)/me/`, 레시피 표시 컴포넌트: 홈 새 레시피, 제목/재료 검색, 카테고리/시간/난이도 필터, URL 페이지 이동, 공개 상세와 과거 버전 선택, 인분 변경, 단계별 조리 보기, 내 초안/발행 목록과 공개 프로필 레시피. 실제 연결 실패 시 fixture로 대체하지 않는다. P0 개발 샘플은 기존 경로를 유지한다.
+- `supabase/migrations/20261012140254_recipes_media.sql`: CLI로 생성한 migration. recipes/drafts/versions/version_assets/media_assets와 RLS/열 단위 읽기 권한, 현재 버전 복합 FK, 불변 발행 스냅샷, idempotency, 초안 낙관적 잠금, DB 호출 제한, SECURITY INVOKER 공개 view/RPC, 제한된 private 쓰기 함수, private Storage 버킷과 직접 접근 차단 정책을 작성했다.
+- `package.json`, `package-lock.json`: Next의 기존 간접 의존성이던 Sharp 0.35.5를 직접 고정했다. 전역 런타임·의존성 버전의 무관한 변경은 하지 않았다.
+- `.env.example`, `docs/02`, `docs/04`: P2 서버 키 용도, migration 적용 전 충돌 확인, private Storage 설정, 처리 재시도/파일 정리 한계, 타입 생성 및 후속 연결 절차를 기록했다.
+
+### 구현 결정
+
+- 초안 자동 저장 대신 명세가 허용한 수동 저장을 제공한다. 저장하지 않은 변경과 처리 중 요청을 표시하고 페이지 이탈 시 경고한다.
+- 버전 본문은 JSONB 한 사본에 저장하고 검색용 핵심 열을 generated column으로 구성한다. 발행 함수가 FK/자산 참조를 함께 기록한다. 동일한 텍스트/수량/사진 바이트의 재발행을 content hash로 제한한다.
+- 처리 결과 경로에 processingToken을 추가했다. 2분 lease가 만료된 작업과 재시도가 겹쳐도 이전 작업이 현재 파일을 덮어쓰지 않도록 시도별 경로와 DB 토큰 검사를 사용한다. DB 결과가 불명확하면 출력 파일을 지우지 않는다.
+- 자산은 하나의 레시피에 귀속하며 최초 단계에서는 recipe 목적만 허용한다. 후기/아바타 업로드는 P3 이후 별도 권한 경로로 확장한다. 레시피당 예약 자산 100개, 계정별 서명 60회/시간, 처리 30회/분, 처리 최대 5시도, 자산 URL 발급 240회/분을 DB에서 제한한다.
+- P2에서는 실제 후기/북마크 통계가 없어 최신 발행순만 제공한다. 해당 통계와 정렬은 P3 범위다. 일반 어워즈·결제·제휴 기능은 추가하지 않았다.
+
+### 실행한 작업과 검증 상태
+
+- `git fetch origin develop`, fast-forward 확인, `feature/p2-recipes-media` 생성. 소스와 Git 변경 목록을 읽었다. commit/push/PR/병합/배포는 하지 않았다.
+- CLI `migration new --help`와 `migration new recipes_media`로 파일만 생성했다. DB/Docker 실행, 원격 연결, migration 적용, Storage 버킷 생성, 실제 업로드/인증 요청은 하지 않았다.
+- Node 24.21.0 경로에서 `npm install --save-exact --ignore-scripts --no-audit --no-fund sharp@0.35.5` 실행. 기존 Sharp 버전의 직접 의존성 승격과 lockfile 반영만 수행했으며 설치 스크립트나 audit은 실행하지 않았다.
+- 설치된 Next.js Route Handlers/Forms 문서, Supabase Storage SDK의 signed upload 구현과 Sharp 타입을 읽었다. [Supabase 변경 기록](https://supabase.com/changelog), [서명 업로드](https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl), [Storage 접근 제어](https://supabase.com/docs/guides/storage/security/access-control), [Sharp 출력/메타데이터/시간 제한](https://sharp.pixelplumbing.com/api-output/)을 참고했다. changelog.md 요청은 도구 오류로 일반 changelog 페이지를 사용했다.
+- **테스트 작성/실행, lint, typecheck, build, DB/E2E, audit, React Doctor, 브라우저 확인: 모두 NOT RUN — 사용자 지시.** 기존 P0 결과는 P1/P2에 대한 검증 근거가 아니다.
+
+### 남은 위험과 다음 작업
+
+1. Supabase 연결과 두 migration 적용은 보류 상태다. 기존 개발 프로젝트 객체/버킷과 충돌 여부, 실제 Postgres 버전, Auth/Storage 설정, 서버 키를 연결 시 확인해야 한다.
+2. SQL 실행·타입 생성·브라우저 렌더링·권한/경합 검증을 하지 않았으므로 아직 동작이나 보안을 검증한 기능으로 취급하지 않는다. 수작업 DB 타입도 연결 후 생성본으로 교체한다.
+3. 사용자 요청 시 두 사용자 간 초안/이미지 접근, 현재/과거 버전의 부모 숨김, 발행 재시도·저장 충돌·지연 처리, 실제 이미지 변환과 메타데이터 제거, 모바일 작성 흐름을 검증한다. 지금 검증 명령을 실행하거나 테스트를 추가하지 않았다.
+4. 만료된 처리 시도의 고아 파일, 미참조 자산, 유효한 업로드 서명으로 다시 만들어진 원본의 장기 자동 정리는 P5 작업이다. 이번 코드의 원본 삭제 실패는 완료 재요청으로 재시도할 수 있다. 호스팅의 Sharp 메모리·실행 시간, 대량 검색 성능은 미확인이다.
+5. 밤에 연결을 재개한 뒤 별도 검증 요청에 맞춰 P1/P2를 확인한다. P3는 후속 기능 요청 시 시작하며, 이번 기능 브랜치는 아직 미커밋 상태다.
+
+## P2 코드 Git Flow 반영 — 2026-10-13 (KST)
+
+- 사용자 요청: P2 변경에 Git Flow 적용. `feature/p2-recipes-media` 커밋·푸시 → `develop` 대상 PR → 병합 → 로컬 develop fast-forward 동기화 범위로 진행한다.
+- 원격 fetch 후 현재 브랜치의 기준 커밋과 origin/develop이 같고 기존 P2 PR이 없음을 확인했다. 현재 P2 소스, migration, Sharp 의존성과 lockfile, 환경변수 예제, 관련 문서를 반영한다. 로컬 환경 파일과 생성 산출물은 포함하지 않는다.
+- 테스트·lint·typecheck·build·DB/E2E·audit·React Doctor·브라우저 검증 보류 지시를 유지한다. PR에도 모든 실행 검증 미실행과 Supabase 미연결·migration 미적용을 명시한다.
+- 이번 반영은 코드 통합이다. 실제 기능/보안 검증 완료 또는 배포 준비 완료를 뜻하지 않는다. Supabase 연결과 원격 DB/Storage 변경, main 릴리스와 배포는 수행하지 않는다.
+- 이후 새 기능은 최신 develop에서 새 작업 브랜치로 시작한다. Supabase 연결·검증은 사용자 재개 요청에 따라 진행한다.

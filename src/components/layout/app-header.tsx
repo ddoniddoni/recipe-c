@@ -23,10 +23,10 @@ export async function AppHeader({ demoMode }: { demoMode: boolean }) {
             레시피 어워즈<span className="brand-caption">가칭</span>
           </Link>
           <Navigation />
-          {demoMode ? <span className="phase-label">개발 샘플</span> : <Link className="account-link"
+          {demoMode ? <span className="phase-label">개발 샘플</span> : <div className="header-actions"><Link className="write-link" href="/recipes/new">레시피 쓰기</Link><Link className="account-link"
             href={viewer.kind === "member" ? "/me" : "/login"}>
             {viewer.kind === "member" ? "내 공간" : "로그인"}
-          </Link>}
+          </Link></div>}
         </div>
       </header>
     </>

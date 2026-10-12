@@ -3,6 +3,7 @@ import { getAppStatus } from "@/lib/env/server";
 import { SetupNotice } from "@/components/layout/setup-notice";
 import { getSampleRecipes } from "@/features/recipes/fixtures.server";
 import { RecipeCard } from "@/features/recipes/components/recipe-card";
+import { LatestRecipes } from "@/features/recipes/components/latest-recipes";
 
 export default function HomePage() {
   const status = getAppStatus();
@@ -66,7 +67,7 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-      ) : (
+      ) : status.hasSupabaseConfig ? <LatestRecipes /> : (
         <SetupNotice hasSupabaseConfig={status.hasSupabaseConfig} />
       )}
     </>
