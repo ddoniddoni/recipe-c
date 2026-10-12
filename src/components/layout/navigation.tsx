@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function Navigation({ mobile = false }: { mobile?: boolean }) {
+export function Navigation({ mobile = false, showAccount = false }: { mobile?: boolean; showAccount?: boolean }) {
   const pathname = usePathname();
   const items = [
     { href: "/", label: "홈" },
     { href: "/recipes", label: "레시피 탐색" },
+    ...(showAccount ? [{ href: "/me", label: "내 공간" }] : []),
   ];
   return (
     <nav
@@ -16,7 +17,9 @@ export function Navigation({ mobile = false }: { mobile?: boolean }) {
     >
       {items.map(({ href, label }) => {
         const active =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+          href === "/" ? pathname === "/" : href === "/me"
+            ? pathname === "/me" || pathname.startsWith("/settings")
+            : pathname.startsWith(href);
         return (
           <Link
             key={href}

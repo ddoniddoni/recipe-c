@@ -456,7 +456,8 @@ p {
   font-size: 0.875rem;
   font-weight: 650;
 }
-.field input {
+.field input,
+.field textarea {
   width: 100%;
   min-height: 3rem;
   padding: 0.625rem 0.875rem;
@@ -465,10 +466,16 @@ p {
   background: var(--color-surface);
   color: var(--color-ink);
 }
+.field textarea {
+  resize: vertical;
+  min-height: 8rem;
+  font: inherit;
+}
 .field input::placeholder {
   color: var(--color-muted);
 }
-.field input[aria-invalid="true"] {
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"] {
   border-color: var(--color-error);
 }
 .field-hint,
@@ -855,7 +862,200 @@ p {
     font-weight: 700;
     background: var(--color-clay-soft);
   }
-  body:has(input:focus) .mobile-nav {
+  body:has(input:focus, textarea:focus) .mobile-nav {
     display: none;
+  }
+}
+
+/* Member pages extend the same recipe-note palette and spacing as public pages. */
+.account-link {
+  margin-left: auto;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  font-size: 0.875rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.account-link:hover {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.auth-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(2rem, 6vw, 6rem);
+  max-width: 64rem;
+  margin: 4rem auto 2rem;
+}
+.auth-note {
+  padding: 2rem 2rem 2rem 1.5rem;
+  border-left: 2px solid var(--color-brand);
+}
+.auth-note h2 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.45;
+  letter-spacing: -0.05em;
+}
+.auth-note p {
+  color: var(--color-muted);
+  max-width: 24rem;
+  margin-block: 1.25rem;
+}
+.auth-panel {
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+.auth-heading {
+  margin-bottom: 2rem;
+}
+.auth-heading h1 {
+  font-size: clamp(1.625rem, 2.8vw, 2rem);
+  margin-bottom: 0.75rem;
+}
+.auth-form,
+.auth-form fieldset {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.auth-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.auth-message {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-herb-soft);
+  overflow-wrap: anywhere;
+}
+.auth-message h2 {
+  font-size: 1.125rem;
+}
+.auth-message + .auth-form {
+  margin-top: 1.5rem;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin-top: 1.25rem;
+}
+.auth-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+.auth-links a:hover {
+  color: var(--color-brand);
+}
+.member-page {
+  max-width: 64rem;
+  margin-inline: auto;
+}
+.settings-page {
+  max-width: 40rem;
+}
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.member-card {
+  display: grid;
+  align-content: start;
+  gap: 0.875rem;
+  min-width: 0;
+  padding: 2rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+.profile-monogram {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 50%;
+  background: var(--color-clay-soft);
+  color: var(--color-brand);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.profile-bio {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.account-email {
+  overflow-wrap: anywhere;
+}
+.member-coming-soon {
+  margin-top: 2rem;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-muted);
+}
+.member-coming-soon h2 {
+  color: var(--color-ink);
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+}
+.member-notice {
+  max-width: 40rem;
+  margin: 3rem auto;
+}
+.member-notice h1 {
+  font-size: 1.75rem;
+}
+.logout-form {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.field input[readonly] {
+  background: var(--color-canvas);
+}
+@media (max-width: 768px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+    max-width: 32rem;
+    margin-block: 2rem;
+    gap: 1.5rem;
+  }
+  .auth-note {
+    padding: 0.75rem 0 0.75rem 1rem;
+  }
+  .auth-note h2 {
+    font-size: 1.375rem;
+  }
+  .auth-note br {
+    display: none;
+  }
+  .auth-note p,
+  .auth-note .text-link {
+    display: none;
+  }
+  .member-grid {
+    grid-template-columns: 1fr;
+  }
+  .member-card {
+    padding: 1.25rem;
   }
 }
