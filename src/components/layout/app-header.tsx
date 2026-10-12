@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Navigation } from "./navigation";
+import { getViewer } from "@/features/auth/viewer";
 
-export function AppHeader({ demoMode }: { demoMode: boolean }) {
+export async function AppHeader({ demoMode }: { demoMode: boolean }) {
+  const viewer = await getViewer();
   return (
     <>
       {demoMode ? (
@@ -21,7 +23,10 @@ export function AppHeader({ demoMode }: { demoMode: boolean }) {
             레시피 어워즈<span className="brand-caption">가칭</span>
           </Link>
           <Navigation />
-          <span className="phase-label">P0 · 준비 중</span>
+          {demoMode ? <span className="phase-label">개발 샘플</span> : <Link className="account-link"
+            href={viewer.kind === "member" ? "/me" : "/login"}>
+            {viewer.kind === "member" ? "내 공간" : "로그인"}
+          </Link>}
         </div>
       </header>
     </>

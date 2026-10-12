@@ -4,10 +4,10 @@
 
 ## 현재 상태
 
-**P0 기반 구현과 검증 완료. 실제 Supabase 인증/DB/Storage 연결 및 P1 이후 기능은 미구현이며 배포하지 않았다. 개발 도구 취약점은 아래 잔여 위험에 별도 기록했다.**
+**P0 기반 구현과 검증 완료. P1 인증·권한 UI/서버/마이그레이션 코드를 작성했다. 사용자의 2026-10-12 지시에 따라 테스트·린트·타입 검사·빌드·브라우저 검증은 별도 요청까지 보류한다. 기존 개발용 Supabase 프로젝트의 URL/ID와 연결 설정이 없어 실제 연결과 DB 적용은 아직 하지 않았다. P1 완료나 동작 검증 통과를 의미하지 않는다.**
 
-현재 단계: P0 완료 (개발용 기반만)
-다음 작업: 사용자 요청 시 P1 인증/권한 기반. 이번 작업에서는 진행하지 않음
+현재 단계: P1 코드 작성, 외부 연결 대기 / 검증 보류
+다음 작업: 사용자가 밤에 Supabase 연동을 재개할 때 지정 개발 프로젝트의 연결 설정·기존 스키마 확인. 테스트는 별도 재개 요청 이후
 서비스명: 레시피 어워즈, 가칭
 확정 스택: Next.js, Supabase, npm
 
@@ -17,7 +17,7 @@
 |---|---|---|
 | 문서 패키지 | 완료 | AGENTS + 제품/UI + 기술/데이터 + 어워즈/수익 + 개발/테스트 |
 | P0 기반 | 완료 | 홈/탐색/상세 개발 샘플, 토큰/공통 상태, 환경 검증, 38개 테스트 및 build 통과 |
-| P1 인증/권한 | 미시작 | 실제 Auth, 계정 매핑, RLS |
+| P1 인증/권한 | 코드 작성 / 연결 대기 / 검증 보류 | 이메일 Auth, 계정 매핑, RLS, 프로필. 실행 검사는 사용자 요청까지 보류 |
 | P2 레시피/이미지 | 미시작 | 초안, 버전, 업로드, 검색 |
 | P3 후기/커뮤니티 | 미시작 | 별점, 사진 후기, 댓글, 북마크, 알림 |
 | P4 어워즈 | 미시작 | 월간 출품, 평가, 안전한 결과 확정 |
@@ -34,13 +34,13 @@
 | Next.js / React | 16.4.0 / 19.3.0 (react-dom 동일) |
 | TypeScript / Tailwind | 5.9.3 strict / 4.3.3, @tailwindcss/turbopack 4.3.3 |
 | ESLint / Zod | 9.39.5 / 4.6.6 |
-| Supabase CLI / JS / SSR | 미설치 |
-| PostgreSQL | 미확인 |
+| Supabase CLI / JS / SSR | 2.120.0 / 2.117.3 / 0.12.7 (P1에서 고정 설치) |
+| PostgreSQL | 기존 개발 프로젝트 버전 미확인. 로컬 config는 17, 실행하지 않음 |
 | 테스트 도구 | Vitest 5.0.3, Testing Library React 16.3.3, jest-dom 7.0.1, user-event 14.6.7, jsdom 30.1.2 |
 
-`.nvmrc`와 `.node-version`은 24.21.0, package.json engines는 Node >=24.21.0 <25 / npm >=11 <13이다. 전역 Node 설정을 변경하지 않았다. Supabase 패키지와 CLI, PostgreSQL은 P1에서 도입/확인한다. lockfile은 npm ci로 재설치 검증했다.
+`.nvmrc`와 `.node-version`은 24.21.0, package.json engines는 Node >=24.21.0 <25 / npm >=11 <13이다. 전역 Node 설정을 변경하지 않았다. P1 Supabase 패키지는 고정 버전으로 추가하고 lockfile을 갱신했다. npm ci 재설치 검증은 P0 당시 기록이며 P1에서는 실행하지 않았다.
 
-## 검증 기록
+## 기존 P0 검증 기록 (P1에는 해당하지 않음)
 
 | 검증 | 상태 | 비고 |
 |---|---|---|
@@ -68,7 +68,7 @@
 
 ## 외부 설정과 출시 차단 항목
 
-현재 P0에는 실제 API 키가 필요하지 않다. P1부터 로컬 Supabase 또는 사용자가 지정한 개발용 Supabase 프로젝트가 필요하다. 비밀값을 이 파일에 기록하지 않는다.
+P0 샘플에는 실제 API 키가 필요하지 않다. P1은 사용자가 선택한 기존 개발용 Supabase 프로젝트에 연결할 예정이다. URL/ID와 공개 키 설정은 아직 확인되지 않았다. 비밀값을 이 파일에 기록하지 않는다.
 
 운영 전에 확정할 것은 정식 서비스명과 도메인, 운영 주체와 연락처, 정책 문구, 실제 SMTP, 관리자 계정, 배포 환경과 비용, 첫 행사 일정이다. 수익화 활성화에는 별도로 제휴 승인과 후원 계약이 필요하다.
 
@@ -192,3 +192,45 @@ export PATH="/Users/ddoni/Documents/Codex/2026-10-12/new-chat/work/runtime/node_
 - DB 변경과 사용자 흐름 변경이 없어 DB/E2E 검사는 추가하지 않았다. 기존 개발 의존성 audit 위험은 이번 작업에서 재검사하거나 수정하지 않았다.
 - 승인 및 초기 구성: 사용자가 Git 초기화, `chore/p0-bootstrap` 최초 커밋, `develop` 생성과 두 브랜치 푸시를 명시적으로 승인했다. `chore/p0-bootstrap`으로 Git을 초기화하고 지정 저장소를 `origin`에 등록했다.
 - 업로드 기준: 최초 커밋 메시지는 `chore(bootstrap): initialize P0 foundation`이며 위 검증을 마친 기존 P0와 이 작업 기록만 포함한다. 빈 원격의 최초 기준점을 두 브랜치에 동일하게 설정하고 `develop`에서 작업을 마친다. 이후 개발은 최신 `develop`에서 별도 작업 브랜치를 만든다. `main`으로의 안정 릴리스 승격, PR, 배포는 별도 요청으로 진행한다.
+
+## P1 인증·권한 코드 작성 — 2026-10-12 (KST)
+
+### 요청과 작업 범위
+
+- 사용자 요청: 다음 기능 개발. **테스트 등 검증은 사용자가 다시 지시할 때까지 중단**한다. 테스트 코드 추가, lint/typecheck/test/build, DB/E2E, audit, React Doctor, DB advisor, 브라우저 확인을 실행하지 않았다.
+- 기존 P0 커밋 `061ec26`과 원격 develop에서 시작했다. `git fetch origin develop`, fast-forward 확인 후 `feature/p1-auth-foundation`을 생성했다. P0 bootstrap 브랜치를 재사용하지 않았다.
+- 연결 대상은 사용자가 선택한 **기존 개발용 Supabase 프로젝트**다. URL 또는 project ID와 `.env.local`의 공개 연결 설정을 요청한 상태다. 로컬 Docker/Supabase/psql 실행 도구도 발견되지 않았으며 Docker를 설치하거나 DB를 시작하지 않았다.
+
+### 작성한 코드
+
+- `src/app/(auth)/`, `src/app/auth/`, `src/features/auth/`: 이메일 가입/확인 재발송/로그인/로그아웃/비밀번호 재설정, 검증 오류·중복 제출 방지·입력 유지, 일회성 token hash 확인과 PKCE callback, 제한된 상대 경로 리다이렉트. Provider 성공 응답을 받은 경우에만 해당 결과를 표시하며 설정 누락·샘플 모드에서는 인증 폼을 비활성 경로로 처리한다.
+- `src/lib/supabase/`, `src/proxy.ts`: JS/SSR 클라이언트 분리, 요청마다 서버 클라이언트 생성, 쿠키 갱신과 응답 cache 헤더 보존, `getClaims` 및 최신 `getUser` 확인, DB RPC 기반 본인 계정 조회. secret/service-role 키는 사용하지 않는다.
+- `src/app/(member)/`, `src/features/profiles/`, `src/app/(public)/u/[handle]/`, `src/app/admin/`: 최초 프로필 설정, 내 공간, 계정 설정, 공개 프로필과 관리자 접근 경계. 관리자 역할은 사용자 metadata 대신 DB에서 조회한다. 역할/상태 수정 UI나 P5 운영 기능은 추가하지 않았다.
+- `supabase/migrations/20261012081353_auth_foundation.sql`: CLI로 생성한 첫 migration 파일. 공개 프로필과 Auth ID 분리, private.accounts/감사 로그/원자적 프로필 수정 속도 제한, 카테고리, RLS/최소 GRANT, 새 Auth 사용자 provisioning과 기존 Auth 사용자 매핑, 본인 프로필 수정 RPC. 프로필 주소는 최초 설정 후 변경 불가다. 공개 프로필은 이메일 확인·정상 상태·최초 설정 조건으로 제한한다.
+- `supabase/config.toml`, `supabase/templates/`: 선택 가능한 로컬 설정과 확인/복구 이메일 템플릿. 기존 원격 프로젝트에는 설정을 별도로 적용해야 한다. 원격 연결/migration 적용/Auth 설정 변경/메일 발송은 실행하지 않았다.
+- `package.json`, `package-lock.json`, `scripts/`: Supabase JS 2.117.3, SSR 0.12.7, CLI 2.120.0을 고정 설치했다. CLI telemetry를 끄는 프로젝트 래퍼, 로컬 db:start/stop/reset, 실패 시 기존 파일을 보존하는 DB 타입 생성 스크립트를 추가했다. `db:reset`은 `--local`로 한정한다. 테스트 스크립트를 성공하는 빈 구현으로 추가하지 않았다.
+- `src/lib/supabase/database.ts`는 migration을 바탕으로 작성한 **수작업 타입 계약**이다. 실제 DB에서 생성한 타입이 아니다. 연결과 migration 적용 후 `npm run db:types -- --linked`로 교체해야 한다.
+- `.env.example`, `docs/02`, `docs/04`: 원격 개발 프로젝트 연결, Auth 설정과 이메일 템플릿, 최초 관리자 지정 절차와 타입 파일 경로를 정리했다. 기존 화면의 색상/타이포그래피를 이어 회원 화면을 추가했으며 실제 레시피 작성·저장·후기·수상·P6 기능은 범위에 포함하지 않았다.
+
+### 실행한 작업과 미실행 항목
+
+- npm registry에서 버전/호환성을 조회하고 Node 24.21.0 환경에서 `npm install --save-exact --ignore-scripts --no-audit --no-fund ...`로 필요한 의존성을 설치했다. 기존 의존성의 무관한 업그레이드는 하지 않았다.
+- CLI `--help`, `init`, `migration new auth_foundation`만 실행했다. 첫 도움말 호출은 전역 telemetry 설정 파일 쓰기가 샌드박스에 막혀 실패했다. 설치된 CLI의 환경변수 지원을 읽어 `SUPABASE_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1`을 설정하자 도움말과 파일 생성이 실행됐다. 전역 설정 변경이나 telemetry 제출은 하지 않았다.
+- 설치된 Next.js의 Proxy/cookies/forms 문서, Supabase changelog와 [SSR 문서](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [비밀번호 인증](https://supabase.com/docs/guides/auth/passwords), [메일 템플릿](https://supabase.com/docs/guides/auth/auth-email-templates), 설치 패키지의 SSR 타입을 확인했다. SSR 0.12.7의 `setAll(cookies, headers)` 계약을 반영했다.
+- **새 코드의 테스트·lint·typecheck·build·DB/E2E·audit·브라우저 검증은 전부 NOT RUN — 사용자 지시.** P0의 PASS 기록을 P1에 적용하지 않는다. 신규 migration의 SQL 실행, 권한 검증, 실제 DB 타입 생성도 미실행이다.
+- 코드와 변경 목록만 읽었다. Git commit/push/PR/배포는 하지 않았다.
+
+### 남은 작업
+
+1. 개발 프로젝트 URL/ID와 `.env.local` 연결 값을 확보하고 기존 스키마/migration 충돌 여부를 확인한다. 대상이 확인되지 않은 원격에 SQL을 실행하지 않는다.
+2. 사용자 요청 범위 내에서 migration 및 원격 Auth의 이메일 확인, redirect allowlist, 템플릿, SMTP를 연결한다. 이번에는 외부 설정을 완료하지 않았다.
+3. 검증 재개 요청 후 DB 타입 생성, 단위/UI/권한/E2E 테스트 작성과 실행, lint/typecheck/build를 진행한다. 미확인 회원, 역할 위조, 세션 만료/폐기, 프로필 직접 쓰기/중복 handle/속도 제한, 외부 redirect, 재사용된 확인·복구 링크를 우선 다룬다.
+4. 앞서 기록한 개발 도구 취약점은 이번에 재조회하지 않았다. P1은 코드 작성 상태이며 연결/검증이 끝나기 전 완료 또는 출시 가능 상태로 취급하지 않는다.
+
+## P1 코드 Git Flow 반영 — 2026-10-12 (KST)
+
+- 사용자 요청으로 기존 개발용 Supabase 연동을 밤으로 미룬다. 연결 정보 요청이나 원격 설정/SQL 적용을 더 진행하지 않으며, 자동 예약 작업도 만들지 않는다.
+- 지금까지 작성한 P1 코드의 Git Flow 반영 범위는 `feature/p1-auth-foundation` 커밋·푸시 → `develop` 대상 PR → 병합과 로컬 develop 동기화다. `main` 릴리스와 배포는 포함하지 않는다.
+- 사용자 지정 검증 보류를 그대로 유지한다. 이번 반영에서도 테스트·lint·typecheck·build·DB/E2E·audit·React Doctor를 실행하지 않는다. PR에는 미검증 상태와 Supabase 미연동·migration 미적용을 명시한다.
+- 기존 P0와 무관한 파일, 로컬 환경 파일, 의존성 디렉터리, 빌드/테스트 산출물은 커밋에 포함하지 않는다. 새 P1 소스, 의존성 lockfile, migration, 설정 예제, 관련 문서가 반영 대상이다.
+- 이후 연동 작업은 최신 `develop`에서 새 작업 브랜치로 시작한다. 이 반영은 코드 보존과 개발 브랜치 통합이며 P1 동작 검증 완료를 뜻하지 않는다.

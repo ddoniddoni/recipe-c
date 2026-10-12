@@ -92,11 +92,55 @@ npm install sharp
 
 Next.js 16에서 lint는 ESLint CLI로 별도 실행한다. next typegen 동작과 설정 로딩은 S20을 참고한다. typecheck를 생략하거나 TypeScript의 ignoreBuildErrors 옵션을 켜서 빌드를 통과시키지 않는다.
 
-DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과를 받아 성공한 경우에만 database.generated.ts를 교체한다. 생성 실패로 기존 파일이 빈 파일이 되는 리다이렉션 실수를 피한다.
+DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과를 받아 성공한 경우에만 `src/lib/supabase/database.ts`를 교체한다. 기존 개발 프로젝트는 명시적으로 `--linked`를 선택할 수 있다. 생성 실패로 기존 파일이 빈 파일이 되는 리다이렉션 실수를 피한다.
 
 최소한 하나의 의미 있는 테스트를 P0부터 두고 `passWithNoTests`를 완료 증거로 사용하지 않는다. 실제 DB와 브라우저 환경이 필요한 테스트는 단위 테스트 결과와 구분한다.
 
 ## 4. Supabase 개발 환경
+
+### 현재 작업의 연결·검증 방침 (2026-10-12)
+
+사용자는 P1에서 **기존 개발용 Supabase 프로젝트**를 사용하기로 선택했다. 프로젝트 URL/ID와 `.env.local` 연결 값은 아직 확인되지 않았다. 로컬 설정은 선택 가능한 보조 환경으로 준비하되 Docker 실행, 원격 DB 변경, Auth 설정 변경을 수행했다고 간주하지 않는다.
+
+또한 사용자 지시로 **테스트, lint, typecheck, build, audit, React Doctor, DB advisor, 브라우저 검증은 별도 요청까지 실행하지 않는다.** 아래 검증 목록은 향후 재개할 때의 기준이며 이번 구현의 통과 기록이 아니다. 새 P1 테스트 작성도 보류한다.
+
+### 기존 개발 프로젝트 연결
+
+1. 대상이 운영 DB가 아닌 개발 프로젝트임을 확인하고 기존 테이블/함수와 migration 이력을 먼저 확인한다. 이 P1 migration은 `public.profiles`, `public.categories`, `private.accounts` 등을 새로 만들므로 동명 객체가 이미 있으면 적용 전에 조정한다. 기존 Auth 사용자는 권한 메타데이터를 복사하지 않고 일반 회원으로 매핑한다. 기존 회원의 프로필/권한 정보를 덮어쓰는 통합 migration으로 사용하지 않는다.
+2. `.env.local`에 `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, 실제 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `DEMO_MODE=false`를 설정한다. P1은 secret/service-role 키를 사용하지 않는다. 실제 키를 문서나 채팅, Git에 넣지 않는다.
+3. Dashboard Auth의 Site URL은 앱과 같은 origin으로 설정한다. Redirect URLs는 `/auth/callback`, `/auth/callback?next=/reset-password`의 정확한 전체 URL만 등록한다. `localhost`와 `127.0.0.1`을 섞지 않는다. 광범위한 wildcard나 외부 사용자 입력 URL을 사용하지 않는다.
+4. 이메일/비밀번호 가입과 **이메일 확인 필수**, 비밀번호 최소 12자, secure password change를 켜고 anonymous sign-in을 끈다. 외부 개발 프로젝트에는 `supabase/config.toml`이 자동 적용되지 않으므로 이 설정과 Auth rate limit을 별도로 확인한다.
+5. 확인 메일과 복구 메일 내용에는 각각 `supabase/templates/confirmation.html`, `recovery.html`을 설정한다. `SiteURL/auth/confirm?token_hash=...&type=signup` 또는 `type=recovery`를 사용하여 서버에서 일회성 토큰을 확인한다. 실제 메일 발송은 해당 프로젝트 SMTP의 수신자 허용과 발송 제한에 달려 있다. 메일 추적에 의한 링크 변경은 끈다.
+6. CLI 연결과 migration 적용은 대상/권한을 확인한 뒤 별도로 진행한다. `npm run supabase -- ...`는 프로젝트에 고정한 CLI를 사용하며 telemetry를 끈다. DB 적용 완료 전 UI의 설정 존재 표시를 연결 성공으로 보지 않는다.
+7. DB 적용 후 타입 생성은 `npm run db:types -- --linked`를 사용한다. 현재 `src/lib/supabase/database.ts`는 **수작업으로 작성한 P1 타입 계약**이다. 생성 스크립트는 정상 종료와 Database 타입 출력을 확인한 뒤 이 파일을 원자적으로 교체하며 실패 시 기존 파일을 보존한다. 사용자 요청 전에는 타입 생성이나 검증도 실행하지 않는다.
+
+가입 → 확인 메일 → `/settings/profile` → `/me` 순서로 연결한다. 비밀번호 복구는 `/forgot-password` → 메일 → `/reset-password` → 재로그인이다. `getClaims`로 토큰을 검증하고, 계정 정보/관리자 경로에는 최신 Auth 사용자와 DB 계정 정보를 사용한다. Proxy는 쿠키 갱신과 `private, no-store` 응답 헤더를 함께 전달한다. 요청별 서버 클라이언트를 사용하며 사용자 세션을 전역 캐시에 저장하지 않는다.
+
+### 최초 관리자 지정
+
+관리자 생성은 회원가입 입력이나 Auth user metadata로 하지 않는다. 프로젝트 소유자가 개발 프로젝트 SQL Editor에서 대상 Auth user ID, 이메일 확인, 정상 계정 상태를 직접 확인한 후 아래 트랜잭션을 사용한다. `<verified-auth-user-id>`를 정확한 UUID로 교체하고 **변경된 행이 정확히 1개인지 확인한 뒤** 커밋한다. 이 SQL을 앱 API나 일반 회원 RPC로 공개하지 않는다.
+
+```sql
+begin;
+with promoted as (
+  update private.accounts a set role = 'admin'
+  from auth.users u
+  where a.auth_user_id = '<verified-auth-user-id>'::uuid
+    and u.id = a.auth_user_id and u.email_confirmed_at is not null
+    and not coalesce(u.is_anonymous, false) and a.status = 'active'
+    and a.role = 'member'
+  returning a.profile_id
+)
+insert into private.audit_log(actor_id, action, entity_type, entity_id, reason)
+select null, 'account.admin_bootstrap', 'profile', profile_id,
+  'Project owner approved initial administrator' from promoted
+returning entity_id;
+-- 확인 후 COMMIT; 대상이 다르거나 행 수가 예상과 다르면 ROLLBACK;
+```
+
+`/admin`은 최신 사용자 확인과 `check_admin_access()`가 모두 허용해야 접근할 수 있다. 일반 사용자의 `role=admin` 메타데이터로는 접근할 수 없다. 실제 운영 도구와 권한/회원탈퇴 관리 UI는 P5에서 구현한다.
+
+### 선택 가능한 로컬 환경
 
 로컬 개발의 권장 경로는 Supabase CLI와 Docker 호환 컨테이너 런타임이다. CLI는 npm dev dependency로 설치한다. S09 참고.
 

@@ -81,13 +81,13 @@ src/
   lib/
     supabase/client.ts
     supabase/server.ts
+    supabase/database.ts   # DB 타입 계약, 연결 후 CLI로 생성
     supabase/admin.ts      # server-only
     supabase/proxy.ts
     env.ts
     errors.ts
     media.ts
     time.ts
-  types/database.generated.ts
   proxy.ts
 supabase/
   config.toml

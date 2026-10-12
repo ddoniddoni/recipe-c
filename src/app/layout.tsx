@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: "%s | 레시피 어워즈",
   },
   description:
-    "나만의 요리법을 나누는 레시피 커뮤니티. 현재 P0 개발 단계입니다.",
+    "나만의 요리법을 나누는 레시피 커뮤니티. 현재 개발 중인 서비스입니다.",
   robots: { index: false, follow: false },
 };
 
@@ -36,7 +36,7 @@ export default async function RootLayout({
           {children}
         </main>
         <AppFooter demoMode={demoMode} />
-        <Navigation mobile />
+        <Navigation mobile showAccount={!demoMode} />
       </body>
     </html>
   );
