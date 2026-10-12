@@ -11,7 +11,7 @@ export default async function AdminPage() {
   // Fresh Auth user + DB role/status/session check; metadata never grants access.
   const { data: current, error: userError } = await supabase.auth.getUser();
   if (userError || !current.user) notFound();
-  const { data: isAdmin, error } = await supabase.rpc("check_admin_access");
+  const { data: isAdmin, error } = await supabase.rpc("re_check_admin_access");
   if (error || !isAdmin) notFound();
   return <section className="member-page">
     <header className="page-heading"><span className="eyebrow">관리자 전용</span><h1>운영 공간</h1></header>

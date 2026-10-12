@@ -6,7 +6,11 @@ export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "비밀번호를 입력해 주세요.").max(128, "비밀번호가 너무 길어요."),
 });
-export const signupSchema = z.object({ email: emailSchema, password: passwordSchema });
+export const signupSchema = z.object({
+  email: emailSchema,
+  name: z.string().trim().min(2, "이름은 2자 이상 입력해 주세요.").max(30, "이름은 30자까지 입력할 수 있어요."),
+  password: passwordSchema,
+});
 export const resetPasswordSchema = z.object({ password: passwordSchema, confirmPassword: z.string() })
   .refine((value) => value.password === value.confirmPassword, {
     path: ["confirmPassword"], message: "두 비밀번호가 일치하지 않아요.",

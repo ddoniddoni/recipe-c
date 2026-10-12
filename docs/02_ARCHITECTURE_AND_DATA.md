@@ -12,7 +12,7 @@
 | 프레임워크 | Next.js 16 계열 App Router | 설치 시 지원 중인 안정 패치를 선택하고 lockfile로 고정 |
 | UI | React, TypeScript strict | Next.js와 호환되는 버전 사용, 불필요한 any 금지 |
 | 스타일 | Tailwind CSS | 초기 scaffold 버전 기준, 디자인 토큰은 한 곳에서 관리 |
-| 인증 | Supabase Auth | 이메일 확인 필수, 서버 렌더링 세션 지원 |
+| 인증 | Supabase Auth | 이메일·이름·비밀번호 가입, 가입 확인 메일 생략, 서버 렌더링 세션 지원 |
 | 데이터 | Supabase PostgreSQL | SQL migration, DB 함수, RLS |
 | 이미지 | Supabase Storage + 서버 이미지 처리 | private 버킷, 직접 업로드, 검증 후 사용 |
 | 입력 | Zod | 클라이언트 UX 검증과 서버 검증, DB 제약은 별도로 적용 |
@@ -34,7 +34,7 @@ React Server Components를 기본으로 하고 편집 폼, 별점 입력, 업로
   └─ 업로드 파일 → 제한된 서명으로 Supabase private Storage
 
 Supabase
-  ├─ Auth: 로그인과 이메일 확인
+  ├─ Auth: 가입과 로그인, 비밀번호 복구
   ├─ PostgreSQL: 데이터, 권한, 원자적 쓰기, 어워즈 평가
   └─ Storage: 비공개 업로드 원본과 처리된 이미지
 ```
@@ -73,8 +73,7 @@ src/
     auth/
     profiles/
     recipes/
-    reviews/
-    comments/
+    community/            # P3 후기·댓글·저장·알림·신고 접수의 UI/계약
     awards/
     moderation/
     monetization/          # P6에 생성
@@ -112,7 +111,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 
-# 서버 전용. 파일 처리 및 계정 삭제 단계부터 필요.
+# 서버 전용. 신규 가입 계정 생성과 파일 처리에 필요.
 SUPABASE_SECRET_KEY=
 
 # 명시적인 개발 화면 시연 전용. 운영 배포에서는 false만 허용.
@@ -139,29 +138,37 @@ DEMO_MODE는 명시적으로 켠 개발 환경에서만 fixture를 읽는다. �
 
 ```text
 auth.users.id
-    ↓ private.accounts.auth_user_id
-private.accounts.profile_id → public.profiles.id
+    ↓ re_private.re_accounts.auth_user_id
+re_private.re_accounts.profile_id → public.re_profiles.id
     ↓
 recipes.author_id / cook_reviews.author_id / comments.author_id
 ```
 
-회원 생성 시 프로필과 private.accounts를 하나의 신뢰 가능한 DB 처리로 생성한다. profiles.id는 별도 UUID다. handle은 임시 고유 값으로 시작한 뒤 최초 설정할 수 있다. `role=admin` 같은 회원 입력은 무시한다.
+현재 가입은 이메일·이름·비밀번호만 받는다(2026-10-13 사용자 요청). 서버 전용 `signup-service.ts`가 `auth.admin.createUser({ email_confirm: true })`로 새 사용자만 생성하고 사용자 세션 클라이언트로 로그인한다. 공유 Auth 전역 확인 설정은 변경하지 않는다. 기존 이메일의 사용자를 자동 확인하거나 비밀번호·metadata를 덮어쓰지 않으며 중복 주소는 로그인으로 안내한다. 비밀번호 복구 메일과 기존 확인 링크 처리는 유지한다.
 
-DB 보조 함수 `private.current_profile_id()`, `private.is_active_member()`, `private.is_admin()`은 실제 auth.uid()를 기준으로 매핑한다. active_member는 계정 상태와 Auth의 이메일 확인을 검증한다. private 스키마를 Data API에 노출하지 않는다. 공개 프로필 조회가 계정 관리 테이블을 직접 노출해서는 안 된다.
+로그인·가입 직후 `re_ensure_account`가 본인 프로필과 re_private.re_accounts를 한 트랜잭션으로 생성한다. 이름은 표시용 `display_name` metadata를 2~30자로 검증해서 사용하고, 고유 handle은 자동 생성하며 프로필 입력 완료로 기록한다. 이름·소개는 나중에 수정할 수 있다. 기존 계정은 본인의 미완료 표시만 완료하고 이름·역할을 덮어쓰지 않는다. 공유 Auth 사용자를 일괄 등록하거나 전역 트리거를 설치하지 않는다. metadata는 역할·상태 판단에 사용하지 않는다.
+
+관리 키는 이 신규 가입 경로와 미디어 처리에만 서버에서 사용한다. 가입 전 `re_consume_signup_limit` RPC가 UTC 시간 단위로 앱 전체 30회/동일 이메일 3회의 요청 한도를 적용한다. 이메일은 서버 키 기반 HMAC으로만 기록하며, RPC는 service_role만 실행한다. 가입 생성과 로그인/프로필 생성은 별도 요청이므로 부분 성공이면 재로그인으로 이어가며 이미 생성된 Auth 계정을 삭제하거나 재생성하지 않는다.
+
+DB 보조 함수 `re_private.re_current_profile_id()`, `re_private.re_is_active_member()`, `re_private.re_is_admin()`은 실제 auth.uid()를 기준으로 매핑한다. active_member는 계정 상태·세션과 Auth 확인 상태를 검사한다. 새 가입의 확인 상태는 서버가 자동 설정한 값이므로 이메일 소유권 검증 완료를 의미하지 않으며 UI에 그렇게 표시하지 않는다. `re_private` 스키마를 Data API에 노출하지 않는다.
 
 ## 6. 데이터 모델 공통 규칙
 
+Supabase 프로젝트를 다른 앱과 공유하므로 모든 앱 테이블의 물리 이름은 `re_` 접두사를 사용한다. public.re_profiles, public.re_recipes, public.re_cook_reviews와 내부 re_private.re_accounts가 기준이다. 뷰·RPC·인덱스·명시적 제약·정책도 `re_`, Storage 버킷은 `re_recipe_media`로 구분한다. 문서의 기능명이나 `/recipes` 같은 URL은 그대로 유지한다. 이후 단계의 테이블도 같은 접두사 규칙을 따른다.
+
+`auth.users`, `auth.sessions`, `storage.buckets`, `storage.objects`는 Supabase 공용 시스템 테이블이다. 이름을 바꾸지 않으며 앱용 migration에서 다른 프로젝트 행을 수정하지 않는다. public 스키마의 default privileges와 기존 private 스키마 권한을 건드리지 않고, 새 re_private 스키마가 이미 있으면 초기 migration을 실패시켜 충돌을 먼저 확인한다. DB 이름 분리는 Auth의 사용자·비밀번호·이메일 설정을 별개로 만드는 기능이 아니다. 공유 Auth 설정 변경/회원 삭제는 다른 앱 영향을 포함해 별도로 설계한다.
+
 모든 시각은 `timestamptz`, DB 저장 기준은 UTC다. 월간 경계 계산은 Asia/Seoul이다. 사용자 입력 시각을 created_at 또는 평가 시각으로 사용하지 않는다. ID는 UUID, 가변 문자에는 최대 길이 검증을 적용한다.
 
-아래 표에서 FK는 외래키, UQ는 UNIQUE, PK는 기본키다. 열 이름은 기본 계약이며 구현 시 보조 인덱스와 제약 이름을 추가한다. public 테이블은 빠짐없이 RLS를 켠다. `private`는 비공개 운영 데이터다.
+아래 표에서 FK는 외래키, UQ는 UNIQUE, PK는 기본키다. 열 이름은 기본 계약이며 구현 시 보조 인덱스와 제약 이름을 추가한다. public 테이블은 빠짐없이 RLS를 켠다. `re_private`는 이 앱만의 비공개 운영 데이터다.
 
 ### 6.1 계정과 분류
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| profiles | id, handle, display_name, bio, avatar_asset_id, visibility_status, created_at | handle UQ, visibility_status=active/deleted. 이메일과 역할 없음 |
-| private.accounts | auth_user_id, profile_id, role, status, is_test_account, created_at | auth_user_id PK/FK auth.users ON DELETE CASCADE, profile_id UQ/FK profiles, role=member/admin, status=active/suspended/deleting |
-| categories | id, slug, name, sort_order, is_active | slug UQ, 관리자만 변경 |
+| re_profiles | id, handle, display_name, bio, avatar_asset_id, visibility_status, created_at | handle UQ, visibility_status=active/deleted. 이메일과 역할 없음 |
+| re_private.re_accounts | auth_user_id, profile_id, role, status, is_test_account, created_at | auth_user_id PK/FK auth.users ON DELETE CASCADE, profile_id UQ/FK profiles, role=member/admin, status=active/suspended/deleting |
+| re_categories | id, slug, name, sort_order, is_active | slug UQ, 관리자만 변경 |
 
 is_test_account는 운영자가 지정하는 개발용 계정 표시이며 기본 false다. 사용자가 변경할 수 없고 실제 어워즈와 운영 실적에서 제외한다. 격리된 DB의 정상 참여 테스트 fixture와 운영 테스트 계정은 구분한다.
 
@@ -171,10 +178,10 @@ profiles의 display_name은 2~30자, bio는 0~300자다. handle은 영문 소문
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| recipes | id, author_id, current_version_id, status, first_published_at, created_at, updated_at | author_id FK profiles, status=draft/published/hidden/deleted |
-| recipe_drafts | recipe_id, body, draft_version, updated_at | recipe_id PK/FK recipes, body JSONB, draft_version 정수 |
-| recipe_versions | id, recipe_id, version_no, title, summary, servings, prep_minutes, cook_minutes, difficulty, category_id, ingredients, steps, tips, tags, cover_asset_id, disclosure_text, content_hash, source_draft_version, publish_request_id, published_at | UQ(recipe_id, version_no), UQ(recipe_id, publish_request_id), 발행 내용은 불변 |
-| recipe_version_assets | version_id, asset_id, slot, position | FK version/assets, slot=cover/step, UQ(version_id,slot,position) |
+| re_recipes | id, author_id, current_version_id, status, first_published_at, created_at, updated_at | author_id FK profiles, status=draft/published/hidden/deleted |
+| re_recipe_drafts | recipe_id, body, draft_version, updated_at | recipe_id PK/FK recipes, body JSONB, draft_version 정수 |
+| re_recipe_versions | id, recipe_id, version_no, title, summary, servings, prep_minutes, cook_minutes, difficulty, category_id, ingredients, steps, tips, tags, cover_asset_id, disclosure_text, content_hash, source_draft_version, publish_request_id, published_at | UQ(recipe_id, version_no), UQ(recipe_id, publish_request_id), 발행 내용은 불변 |
+| re_recipe_version_assets | version_id, asset_id, slot, position | FK version/assets, slot=cover/step, UQ(version_id,slot,position) |
 
 current_version_id는 다른 레시피의 버전을 가리킬 수 없다. recipe_versions에 UQ(recipe_id,id)를 추가하고 recipes의 `(id,current_version_id)`에 복합 FK를 설정하는 등 DB에서 일치 조건을 보장한다. 최초 draft 상태에서는 current_version_id가 NULL이다.
 
@@ -210,12 +217,12 @@ DB 함수는 배열 타입, 요소 수, 필드 타입, 문자열 길이, 인분�
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| cook_reviews | id, recipe_id, recipe_version_id, author_id, rating, body, status, revision, created_at, updated_at | UQ(author_id,recipe_version_id), rating 정수 1~5, status=published/hidden/deleted |
-| review_assets | review_id, asset_id, position | FK reviews/assets, UQ(review_id,position), 1~3장 |
-| recipe_comments | id, recipe_id, author_id, parent_id, kind, body, status, revision, created_at, updated_at | parent는 같은 recipe의 최상위 댓글만 가능 |
-| bookmarks | profile_id, recipe_id, created_at | PK(profile_id,recipe_id) |
-| notifications | id, recipient_id, actor_id, type, entity_id, event_key, read_at, created_at | UQ(recipient_id,event_key), 수신자만 읽음 |
-| reports | id, reporter_id, recipe_id, review_id, comment_id, reason_code, detail, status, created_at | 대상 FK 세 개 중 정확히 하나만 NOT NULL |
+| re_cook_reviews | id, recipe_id, recipe_version_id, author_id, rating, body, status, revision, created_at, updated_at | UQ(author_id,recipe_version_id), rating 정수 1~5, status=published/hidden/deleted |
+| re_review_assets | review_id, asset_id, position | FK reviews/assets, UQ(review_id,position), 1~3장 |
+| re_recipe_comments | id, recipe_id, author_id, parent_id, kind, body, status, revision, created_at, updated_at | parent는 같은 recipe의 최상위 댓글만 가능 |
+| re_bookmarks | profile_id, recipe_id, created_at | PK(profile_id,recipe_id) |
+| re_notifications | id, recipient_id, actor_id, type, entity_id, event_key, read_at, created_at | UQ(recipient_id,event_key), 수신자만 읽음 |
+| re_reports | id, reporter_id, recipe_id, review_id, comment_id, reason_code, detail, status, created_at | 대상 FK 세 개 중 정확히 하나만 NOT NULL |
 
 cook_reviews의 recipe_id와 recipe_version_id는 복합 FK로 같은 레시피임을 보장한다. soft delete 후 같은 버전에 새 행을 생성해 중복 제한을 우회하지 않는다. 복원 또는 기존 행 편집 경로를 사용한다.
 
@@ -223,18 +230,29 @@ cook_reviews의 recipe_id와 recipe_version_id는 복합 FK로 같은 레시피�
 
 댓글의 kind는 question/substitution/suggestion/general이다. 삭제된 원댓글은 본문을 지운 자리표시자로 처리하고 다른 사용자의 답글은 유지할 수 있다. 숨김된 본문을 답글 API나 알림 미리보기에서 반환하지 않는다.
 
+P3 구현 계약:
+
+- 후기 생성·편집·삭제는 `re_private.re_mutate_cook_review` 한 경로에서 처리한다. `re_upsert_cook_review`와 `re_delete_cook_review`는 사용자 세션의 공개 진입점이다. 삭제 호출도 versionId + expectedRevision + requestId를 받아 본인 행만 처리한다. 삭제 시 본문/별점을 비우고 사진 참조를 제거하며 행과 revision은 유지한다. 다시 작성하면 같은 행을 복원하고 최초 생성 알림을 재발송하지 않는다.
+- 후기와 댓글은 last_request_id 및 입력 hash로 같은 요청의 재시도를 처리한다. 댓글은 클라이언트가 생성한 고정 UUID를 식별자로 쓰되 소유자는 DB 세션에서 정한다. 기존 댓글의 레시피·부모는 바꿀 수 없다. 정상 클라이언트가 기대한 revision과 DB가 다르면 CONFLICT다. 다른 화면 동작의 새로고침이 작성 중인 글을 덮어쓰지 않도록 편집 기준 revision을 유지한다.
+- 쓰기 잠금 순서는 계정 → 레시피 → 후기/댓글 → 정렬된 사진 ID다. 계정 잠금으로 같은 사용자의 요청과 호출 제한을 직렬화한다. P4는 후기 변경 함수 내부에 행사 ID 순 잠금, 잠금 후 서버 시각 검사, snapshot/source_revision 갱신을 추가해야 한다. P3에 가짜 월간 평가 기록이나 성공 stub을 만들지 않았다.
+- 후기/댓글은 공개 부모의 상태와 작성자 공개 자격을 함께 확인한다. deleted 원댓글은 비운 본문의 자리표시자로 남기고 답글을 읽을 수 있지만 hidden 부모의 답글은 공개하지 않는다. 신고나 알림에도 숨겨진 본문 사본을 보관하지 않는다.
+- 북마크 행/알림/신고 접수 상태는 본인에게만 SELECT를 허용한다. 북마크 총수만 좁은 private 함수로 공개하며 저장한 사람의 목록은 반환하지 않는다. 일반 사용자의 직접 테이블 쓰기는 revoke하고 좁은 RPC만 허용한다.
+- `re_get_recipe_community`는 후기 12개, 최상위 댓글 12개를 페이지로 반환한다. 기본 답글은 스레드당 3개이며 `thread` 선택 시 12개씩 읽는다. 페이지는 최대 100이다. 내 후기 목록은 공개 부모의 본인 published/hidden/deleted 기록을 보여 주고, 공개 프로필에는 published 후기만 반환한다.
+- notifications는 후기 생성/답글에만 생성하며 본문을 저장하지 않는다. 수신자와 event_key의 UNIQUE로 중복을 막는다. 조회 시 현재 공개 view와 결합해 접근 불가 대상의 링크를 없앤다. 읽음 처리는 본인 ID만 대상으로 하고 최대 100개다.
+- 신고 사유는 spam/abuse/rights/unsafe/other, 설명은 10~1,000자다. 같은 대상의 pending/reviewing 신고가 있으면 기존 접수 ID를 반환한다. 관리자 판단과 상태 전이는 P5에서 구현한다.
+
 신고 대상이 여러 종류인 경우 식별자 문자열 하나만 저장하지 말고 nullable FK와 `num_nonnulls(...)=1` 같은 제약으로 대상을 보장한다. 동일 사용자의 같은 대상 중복 미처리 신고를 제한한다. 관리자 내부 메모는 reports.detail에 섞지 않고 비공개 감사 이력에 저장한다.
 
 ### 6.4 어워즈
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| award_periods | id, slug, kind, month_key, title, theme, submission_opens_at, submission_closes_at, voting_opens_at, voting_closes_at, finalize_not_before, state, rules, source_revision, final_run_id, created_by | slug UQ, kind=monthly/sponsored, 첫 베타는 monthly만 생성 |
-| award_entries | id, period_id, recipe_id, recipe_version_id, author_id, status, submitted_at | UQ(period_id,recipe_id), UQ(period_id,author_id), 출품 버전 고정 |
-| award_evaluations | id, period_id, entry_id, reviewer_id, review_id, rating_snapshot, eligibility, evaluated_at, updated_at | UQ(entry_id,reviewer_id), UQ(period_id,review_id), 내부 평가 자료 |
-| award_runs | id, period_id, source_revision, input_hash, rules_snapshot, status, prepared_at, finalized_at, idempotency_key | UQ(period_id,idempotency_key), status=prepared/finalized/superseded |
-| private.award_run_inputs | run_id, evaluation_id, entry_id, rating, included, exclusion_code | 집계에 사용한 최소 입력 스냅샷, 후기 본문과 사진 복제 금지 |
-| award_results | run_id, entry_id, recipe_id, recipe_version_id, author_id, rank, medal, review_count, rating_sum, five_star_count, raw_average, adjusted_score, visibility_status | PK(run_id,entry_id), 수상하지 않은 적격 후보 결과도 보존 |
+| re_award_periods | id, slug, kind, month_key, title, theme, submission_opens_at, submission_closes_at, voting_opens_at, voting_closes_at, finalize_not_before, state, rules, source_revision, final_run_id, created_by | slug UQ, kind=monthly/sponsored, 첫 베타는 monthly만 생성 |
+| re_award_entries | id, period_id, recipe_id, recipe_version_id, author_id, status, submitted_at | UQ(period_id,recipe_id), UQ(period_id,author_id), 출품 버전 고정 |
+| re_award_evaluations | id, period_id, entry_id, reviewer_id, review_id, rating_snapshot, eligibility, evaluated_at, updated_at | UQ(entry_id,reviewer_id), UQ(period_id,review_id), 내부 평가 자료 |
+| re_award_runs | id, period_id, source_revision, input_hash, rules_snapshot, status, prepared_at, finalized_at, idempotency_key | UQ(period_id,idempotency_key), status=prepared/finalized/superseded |
+| re_private.re_award_run_inputs | run_id, evaluation_id, entry_id, rating, included, exclusion_code | 집계에 사용한 최소 입력 스냅샷, 후기 본문과 사진 복제 금지 |
+| re_award_results | run_id, entry_id, recipe_id, recipe_version_id, author_id, rank, medal, review_count, rating_sum, five_star_count, raw_average, adjusted_score, visibility_status | PK(run_id,entry_id), 수상하지 않은 적격 후보 결과도 보존 |
 
 month_key는 일반 월간 행사의 해당 월 1일을 나타내는 DATE다. monthly에는 필수이고 sponsored에는 NULL이다. 취소되지 않은 monthly 행사에 대해 month_key의 부분 UNIQUE 인덱스를 두어 같은 달 일반 행사를 중복 생성하지 않는다. source_revision은 0부터 시작하는 BIGINT다. 최초 베타 일정은 접수 시작 < 접수 마감 = 평가 시작 < 평가 종료 <= 확정 가능 시각을 DB에서 검증한다.
 
@@ -248,20 +266,22 @@ award_entries의 author_id는 recipes.author_id와 일치해야 한다. period_i
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| media_assets | id, owner_id, purpose, status, bucket, original_path, processed_path, mime_type, bytes, width, height, sha256, created_at | purpose=recipe/review/avatar, status=pending/processing/ready/rejected/deleted |
-| private.audit_log | id, actor_id, action, entity_type, entity_id, reason, safe_metadata, created_at | append-only, 비밀번호/토큰/불필요한 본문 저장 금지 |
-| private.rate_limit_buckets | scope_key, operation, bucket_start, count | 복합 PK, DB의 원자적 갱신 |
-| private.account_deletion_jobs | id, profile_id, auth_user_id, stage, status, last_error_code, created_at, updated_at, finished_at | 재시도 가능, 최종 처리 후 불필요한 Auth 식별자 제거 |
+| re_media_assets | id, owner_id, purpose, status, bucket, original_path, processed_path, mime_type, bytes, width, height, sha256, created_at | purpose=recipe/review/avatar, status=pending/processing/ready/rejected/deleted |
+| re_private.re_audit_log | id, actor_id, action, entity_type, entity_id, reason, safe_metadata, created_at | append-only, 비밀번호/토큰/불필요한 본문 저장 금지 |
+| re_private.re_rate_limit_buckets | scope_key, operation, bucket_start, count | 복합 PK, DB의 원자적 갱신 |
+| re_private.re_account_deletion_jobs | id, profile_id, auth_user_id, stage, status, last_error_code, created_at, updated_at, finished_at | 재시도 가능, 최종 처리 후 불필요한 Auth 식별자 제거 |
 
 media_assets의 저장 경로, 해시, 운영 메타데이터 전체를 공개 응답에 담지 않는다. 공개 미디어 응답 모델은 assetId, 안정적인 미디어 경로, width, height, alt 정도로 제한한다. 공개 읽기가 필요한 조회는 열 단위 GRANT 또는 안전한 projection RPC로 제한한다.
 
 ### 6.6 P6 전용 데이터
 
-P6에서 affiliate_links와 private.affiliate_clicks, sponsor_campaigns를 migration으로 추가한다. 초기 명세에 포함됐다는 이유로 P1에서 빈 정산 시스템과 수익 테이블까지 만들지 않는다. 세부 필드는 03 문서가 기준이다.
+P6에서 affiliate_links와 re_private.re_affiliate_clicks, sponsor_campaigns를 migration으로 추가한다. 초기 명세에 포함됐다는 이유로 P1에서 빈 정산 시스템과 수익 테이블까지 만들지 않는다. 세부 필드는 03 문서가 기준이다.
 
 ## 7. 읽기, 검색, 집계
 
 일반 레시피의 대표 평점은 현재 발행 버전에 달린 published 후기만 집계한다. raw average와 count를 함께 반환한다. 현재 버전 통계 view는 recipes.id당 정확히 한 행이어야 한다. 후기와 북마크를 동시에 join해 행이 곱해지는 집계 오류를 피하고 각각 먼저 집계한다.
+
+P3는 `re_recipe_version_stats`를 요청 시 계산하는 SECURITY INVOKER view로 구성한다. 공개 published 후기만 버전별로 먼저 집계하므로 편집/삭제 후 별도의 비동기 카운터 동기화가 필요하지 않다. 북마크 집계는 따로 결합해 행 곱셈을 피한다. 탐색 평점순은 `(rating_sum + 3.5 × 5) / (count + 5)`를 쓰고 후기 없는 레시피를 마지막에 둔다. 화면에는 보정 점수가 아닌 실제 평균과 개수를 표시한다. 후기 많은 순, 저장 많은 순, 최신순도 제공하고 동점은 발행 시각과 레시피 ID로 안정적으로 정렬한다. 월간 어워즈 결과와는 별도다.
 
 읽기 view를 노출할 때는 적용 중인 PostgreSQL 버전에서 `security_invoker=true` 등 RLS를 지키는 방식을 사용하고 실제 역할로 테스트한다. 보안 검토 없이 기본 definer view로 비공개 초안을 노출하지 않는다. S06 참고.
 
@@ -294,14 +314,14 @@ RLS와 GRANT는 함께 설정한다. RPC 실행 권한도 별도다. S06과 S07 
 | 평가 자료 | 불가 | 자신의 반영 상태만 | 집계 조회 | 후기 처리에서만 갱신 |
 | 준비 중 집계/결과 | 불가 | 불가 | 읽기 | 집계 함수 |
 | 확정 결과 | 선택된 final_run의 공개 결과 | 동일 | 감사 정보 포함 | 직접 변경 금지 |
-| media_assets | 안전한 공개 projection만 | 본인 또는 공개 참조 이미지 | 운영 조회 | 서버 처리 전용 |
-| private.* | 불가 | 불가 | 제한 RPC 결과만 | 신뢰 함수와 서버 작업만 |
+| re_media_assets | 안전한 공개 projection만 | 본인 또는 공개 참조 이미지 | 운영 조회 | 서버 처리 전용 |
+| re_private.* | 불가 | 불가 | 제한 RPC 결과만 | 신뢰 함수와 서버 작업만 |
 
 모든 공개 하위 자료의 가시성은 상위 레시피 상태도 검사한다. recipe가 hidden인데 review_assets, 특정 버전 URL, 검색 view, JSON-LD, 공유 미리보기에서 내용이 노출되면 실패다.
 
 SECURITY DEFINER 함수는 search_path를 빈 값 또는 엄격한 고정 값으로 설정하고 객체를 스키마로 한정한다. PUBLIC/anon의 기본 execute를 취소한 뒤 필요한 역할만 허용한다. authenticated에 허용했다고 모든 사용자의 데이터 접근을 허용한 것이 아니다. 함수마다 auth.uid(), current_profile_id, active status, 소유권을 검사한다. 관리자 함수도 실제 DB 역할 확인을 한다. S07 참고.
 
-private 보조 함수가 공개 테이블 policy를 재귀 호출하지 않도록 설계한다. 관리 상태 확인에 필요한 최소 데이터만 반환한다. Storage에는 별도 정책을 적용하며 public 테이블 RLS가 파일 접근까지 자동 보장한다고 가정하지 않는다. RLS에서 호출하는 private 보조 함수의 최소 실행 권한은 필요한 역할에 허용하되 private 스키마를 Data API에 노출하지 않는다. 단순히 스키마 이름이 private이라는 이유로 SQL 권한 검토를 생략하지 않는다.
+private 보조 함수가 공개 테이블 policy를 재귀 호출하지 않도록 설계한다. 관리 상태 확인에 필요한 최소 데이터만 반환한다. Storage에는 별도 정책을 적용하며 public 테이블 RLS가 파일 접근까지 자동 보장한다고 가정하지 않는다. RLS에서 호출하는 private 보조 함수의 최소 실행 권한은 필요한 역할에 허용하되 `re_private` 스키마를 Data API에 노출하지 않는다. 단순히 스키마 이름이 re_private이라는 이유로 SQL 권한 검토를 생략하지 않는다.
 
 ## 9. 서버 기능과 RPC 계약
 
@@ -353,9 +373,11 @@ DB가 차단한 경합 오류는 적절한 코드로 변환한다. 네트워크�
 
 ## 10. 이미지 파이프라인
 
-private 버킷 `recipe-media` 하나로 시작한다. 원본 경로는 `originals/{profileId}/{assetId}`, 처리 결과는 `processed/{profileId}/{assetId}/{processingToken}.webp`다. 사용자 파일명을 저장 경로에 직접 사용하지 않는다. Storage의 일반 anon/authenticated 직접 읽기, 삭제, 덮어쓰기는 허용하지 않는다. 업로드는 서버가 발급한 정확한 original 경로의 서명으로만 진행하고 processed 경로에는 업로드 권한을 주지 않는다. 처리된 파일을 덮어쓰지 않으며 콘텐츠 참조가 있는 파일을 사용자가 임의로 삭제하는 API도 제공하지 않는다. public 버킷은 URL 보유자의 읽기를 막지 못하므로 비공개 초안과 신고 이미지에 사용하지 않는다. S08 참고.
+private 버킷 `re_recipe_media` 하나로 시작한다. 원본 경로는 `originals/{profileId}/{assetId}`, 처리 결과는 `processed/{profileId}/{assetId}/{processingToken}.webp`다. 사용자 파일명을 저장 경로에 직접 사용하지 않는다. Storage의 일반 anon/authenticated 직접 읽기, 삭제, 덮어쓰기는 허용하지 않는다. 업로드는 서버가 발급한 정확한 original 경로의 서명으로만 진행하고 processed 경로에는 업로드 권한을 주지 않는다. 처리된 파일을 덮어쓰지 않으며 콘텐츠 참조가 있는 파일을 사용자가 임의로 삭제하는 API도 제공하지 않는다. public 버킷은 URL 보유자의 읽기를 막지 못하므로 비공개 초안과 신고 이미지에 사용하지 않는다. S08 참고.
 
 P2에서는 처리 잠금이 2분 뒤 만료되며 최대 5번 처리할 수 있다. 시도마다 다른 processingToken 경로를 사용하고 DB 완료 RPC도 현재 토큰을 검사하므로 늦게 끝난 이전 작업이 재시도 결과를 덮어쓰지 않는다. ready 전환 RPC는 service_role에만 실행 권한을 주고 일반 사용자용 reserve/claim RPC는 매번 세션·작성자·레시피 상태를 확인한다. 자산을 레시피 하나에 귀속해 타인 자산뿐 아니라 다른 레시피의 asset ID도 초안 저장/발행에서 거절한다.
+
+P3에서는 media_assets에 `recipe_version_id`와 `purpose=review`를 추가한다. 레시피 사진은 versionId=NULL, 후기 사진은 동일 레시피의 특정 발행 버전을 복합 FK로 고정한다. `re_reserve_review_upload`는 공개 타인 레시피만 허용하고 계정/버전당 최대 30개 예약을 허용한다. recipe 목적의 기존 100개 제한에는 후기 사진을 포함하지 않는다. 기존 claim/finish 처리 파이프라인을 공유하지만 목적별 소유권·공개 부모·후기 숨김 상태를 다시 검사한다. ready 후기 사진은 본인 또는 공개 published 후기의 참조를 통해서만 공개 URL을 발급한다. 아바타 업로드는 아직 지원하지 않는다.
 
 원본 삭제가 실패하면 ready 상태는 유지하고 다음 완료 요청에서 정리를 재시도한다. 만료된 업로드 서명은 같은 upload_request_id로 갱신할 수 있다. 원본 업로드 서명은 제공자 기본 유효기간을 따르며, 이미 삭제한 원본 경로에 유효한 서명으로 다시 올린 미참조 파일도 P5 정리 대상이다. 만료된 처리 시도의 고아 출력과 장기간 미참조 원본/ready 자산 정리 작업은 P5에서 추가한다. P2는 성공 응답이 불명확한 출력 파일을 즉시 삭제하지 않는다.
 
@@ -395,10 +417,12 @@ P2에서는 처리 잠금이 2분 뒤 만료되며 최대 5번 처리할 수 있
 | 댓글 작성 | 계정당 분당 5개, 하루 100개 |
 | 이미지 서명 발급 | 계정당 시간당 60개 |
 | 신고 | 계정당 하루 20개 |
+| 후기·댓글 편집/삭제 | 각 계정당 분당 30회 |
+| 북마크 설정 / 알림 읽음 처리 | 각 계정당 분당 60회 |
 
 시간 bucket은 서버 시각 기준 고정 창으로 시작한다. 창 경계에서 일시적으로 두 배 가까운 호출이 가능하다는 한계를 인지하고 공격 패턴이 나타나면 개선한다. IP만으로 같은 집이나 학교의 정상 사용자를 차단하지 않는다. IP를 저장해야 하는 별도 보안 목적은 보관 정책과 함께 검토하며 기본 로그에 원문 IP를 영구 저장하지 않는다.
 
-Auth 가입과 메일 발송의 제한은 Supabase 설정에서 별도로 적용한다. 실제 사용자 대상 메일 발송은 기본 개발 메일 서비스가 아니라 운영용 SMTP 설정과 전달 테스트가 필요하다. S12 참고.
+신규 가입은 서버 전용 Admin API를 사용하므로 앱의 `re_consume_signup_limit`으로 별도 제한한다. 로그인·비밀번호 복구와 메일 발송 제한은 Supabase 설정을 따른다. 실제 복구 메일 발송은 운영용 SMTP 설정과 전달 확인이 필요하다. S12 참고.
 
 ## 12. 알림과 공개 캐시
 
@@ -418,7 +442,7 @@ Auth 가입과 메일 발송의 제한은 Supabase 설정에서 별도로 적용
 2. 본인 레시피와 후기의 공개 노출을 중단한다. 미확정 행사 출품과 평가 자격을 갱신한다.
 3. 프로필을 비식별 표시로 바꾸고 bio와 avatar 참조를 제거한다. 다른 사람의 답글 구조는 필요한 범위에서 유지한다.
 4. 삭제 대상 이미지와 본문을 정리한다. 이미 확정된 결과는 점수와 순위 같은 최소 기록만 남기고 삭제된 레시피의 제목/이미지/프로필을 다시 노출하지 않는다.
-5. 서버 전용 Auth API로 계정을 제거하고 private.accounts의 연결을 제거한다. 작업 로그에서 더 이상 필요하지 않은 Auth 식별자를 지운다.
+5. 이 앱의 re_private.re_accounts 연결과 앱 데이터를 정리한다. 공유 auth.users 계정을 자동 삭제하거나 다른 앱의 세션을 일괄 폐기하지 않는다. Supabase Auth 계정 전체 삭제는 다른 앱 사용 여부와 별도 명시적 요청을 확인한 운영 절차로 분리한다. 작업 로그에서 더 이상 필요하지 않은 Auth 식별자를 지운다.
 6. 실패한 단계만 재시도할 수 있게 하고 관리자에게 미완료 작업을 표시한다.
 
 발행 내용의 불변성은 일반 편집에 대한 원칙이다. 삭제와 개인정보 처리에 필요한 관리자 purge는 예외이며 사유와 작업 이력을 남긴다. 수상 스냅샷이 있다는 이유로 탈퇴 사용자의 사진과 본문을 영구 보존하지 않는다. 보관 기간, 법적 예외, 약관 문구는 실제 출시 전에 확정해야 하는 운영 조건이다.

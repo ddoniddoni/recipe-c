@@ -13,8 +13,8 @@ async function post<T>(url: string, data: unknown): Promise<RecipeResult<T>> {
   return response.json() as Promise<RecipeResult<T>>;
 }
 
-export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disabled }: {
-  recipeId: string; assetId: string | null; label: string;
+export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disabled, reviewVersionId }: {
+  recipeId: string; reviewVersionId?: string; assetId: string | null; label: string;
   onChange: (id: string | null) => void; onBusy: (busy: boolean) => void; disabled: boolean;
 }) {
   const inputId = useId();
@@ -33,7 +33,7 @@ export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disa
         setMessage("앞서 올린 사진의 처리 결과를 확인하고 있어요…");
         const previous = await post<{ assetId: string }>("/api/uploads/complete", { assetId: current.ticket.assetId });
         if (previous.ok) {
-          onChange(previous.data.assetId); setMessage("사진 준비 완료. 초안을 저장해 주세요.");
+          onChange(previous.data.assetId); setMessage("사진 준비 완료. 작성 중인 내용을 저장해 주세요.");
           attempt.current = null; setHasFile(false); return;
         }
         if (previous.code !== "UPLOAD_MISSING") {
@@ -46,7 +46,7 @@ export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disa
       }
       if (!current.ticket) {
         setMessage("사진을 올릴 준비를 하고 있어요…");
-        const signed = await post<UploadTicket>("/api/uploads/sign", { recipeId, requestId: current.requestId });
+        const signed = await post<UploadTicket>("/api/uploads/sign", reviewVersionId ? { versionId: reviewVersionId, requestId: current.requestId, purpose: "review" } : { recipeId, requestId: current.requestId, purpose: "recipe" });
         if (!signed.ok) { setMessage(signed.message); setFailed(true); return; }
         current.ticket = signed.data;
       }
@@ -55,7 +55,7 @@ export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disa
       setMessage("사진을 업로드하고 있어요…");
       // A retry can report an existing object after the first upload succeeded.
       // Completion verifies the actual immutable bytes in either case.
-      await client.storage.from("recipe-media").uploadToSignedUrl(current.ticket.path, current.ticket.token, current.file,
+      await client.storage.from("re_recipe_media").uploadToSignedUrl(current.ticket.path, current.ticket.token, current.file,
         { contentType: current.file.type, cacheControl: "0" });
       setMessage("사진의 형식과 크기를 확인하고 있어요…");
       const complete = await post<{ assetId: string }>("/api/uploads/complete", { assetId: current.ticket.assetId });
@@ -64,7 +64,7 @@ export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disa
         if (complete.code === "UPLOAD_REJECTED") { attempt.current = null; setHasFile(false); }
         return;
       }
-      onChange(complete.data.assetId); setMessage("사진 준비 완료. 초안을 저장하면 사진 선택도 저장돼요.");
+      onChange(complete.data.assetId); setMessage("사진 준비 완료. 작성 중인 내용을 저장하면 사진 선택도 저장돼요.");
       attempt.current = null; setHasFile(false);
     } catch { setMessage("사진 처리 결과를 확인하지 못했어요. 같은 사진으로 다시 시도할 수 있어요."); setFailed(true); }
     finally { setBusy(false); onBusy(false); }
@@ -88,7 +88,7 @@ export function ImageUploader({ recipeId, assetId, label, onChange, onBusy, disa
     <p id={`${inputId}-hint`} className="field-hint">JPEG · PNG · WebP / 최대 5MB · 6,000px · 2,000만 화소. 위치 정보는 제거해요.</p>
     <div className="editor-inline-actions">
       {hasFile ? <Button variant="secondary" onClick={upload} disabled={disabled || busy}>{busy ? "사진 처리 중…" : failed ? "같은 사진 다시 시도" : "사진 올리기"}</Button> : null}
-      {assetId ? <Button variant="secondary" disabled={disabled || busy} onClick={() => { onChange(null); setMessage("사진 선택을 해제했어요. 초안을 저장해 주세요."); }}>사진 선택 해제</Button> : null}
+      {assetId ? <Button variant="secondary" disabled={disabled || busy} onClick={() => { onChange(null); setMessage("사진 선택을 해제했어요. 작성 중인 내용을 저장해 주세요."); }}>사진 선택 해제</Button> : null}
     </div>
     <p id={`${inputId}-status`} role={failed ? "alert" : "status"} className={failed ? "field-error" : "field-hint"}>{message}</p>
   </div>;

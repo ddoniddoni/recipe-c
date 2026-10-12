@@ -20,7 +20,7 @@ export function filterSampleRecipes(
   );
 }
 
-export type RecipeSearch = { q: string; category: string; maxMinutes: number; difficulty: string; sort: "newest"; page: number };
+export type RecipeSearch = { q: string; category: string; maxMinutes: number; difficulty: string; sort: "newest" | "rating" | "reviews" | "saved"; page: number };
 export function parseRecipeSearch(params: Record<string, string | string[] | undefined>): RecipeSearch {
   const single = (key: string) => Array.isArray(params[key]) ? params[key]?.[0] : params[key];
   const page = Number(single("page") ?? 1);
@@ -31,7 +31,7 @@ export function parseRecipeSearch(params: Record<string, string | string[] | und
     q: normalizeSampleQuery(params.q), category: /^[a-z][a-z0-9-]{1,39}$/.test(category) ? category : "",
     maxMinutes: Number.isInteger(minutes) && minutes > 0 && minutes <= 1440 ? minutes : 1440,
     difficulty: ["easy", "medium", "hard"].includes(difficulty) ? difficulty : "",
-    sort: "newest", // Review/bookmark sorts arrive with P3's real statistics.
+    sort: (["rating", "reviews", "saved"].includes(single("sort") ?? "") ? single("sort") : "newest") as RecipeSearch["sort"],
     page: Number.isInteger(page) ? Math.min(100, Math.max(1, page)) : 1,
   };
 }

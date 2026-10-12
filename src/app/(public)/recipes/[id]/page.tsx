@@ -15,6 +15,8 @@ import {
 } from "@/features/recipes/components/recipe-content";
 import { PublishedRecipeDetail } from "@/features/recipes/components/published-recipe-detail";
 
+import { parseCommunitySearch } from "@/features/community/schemas";
+
 export const metadata: Metadata = { title: "레시피 상세" };
 
 export default async function RecipePage({
@@ -22,12 +24,12 @@ export default async function RecipePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ version?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const status = getAppStatus();
   if (!status.demoMode && status.hasSupabaseConfig) {
     const [{ id }, query] = await Promise.all([params, searchParams]);
-    return <PublishedRecipeDetail id={id} versionId={Array.isArray(query.version) ? query.version[0] : query.version} />;
+    return <PublishedRecipeDetail id={id} communitySearch={parseCommunitySearch(query)} versionId={Array.isArray(query.version) ? query.version[0] : query.version} />;
   }
   if (!status.demoMode)
     return (

@@ -6,7 +6,10 @@ import { mediaJson, mediaMember, readMediaRequest } from "@/features/media/route
 import { recipeDbError, recipeError } from "@/features/recipes/result";
 
 export const runtime = "nodejs";
-const schema = z.object({ recipeId: z.uuid(), requestId: z.uuid() }).strict();
+const schema = z.union([
+  z.object({ purpose: z.literal("recipe").optional(), recipeId: z.uuid(), requestId: z.uuid() }).strict(),
+  z.object({ purpose: z.literal("review"), versionId: z.uuid(), requestId: z.uuid() }).strict(),
+]);
 export async function POST(request: NextRequest) {
   const context = createSupabaseRouteClient(request);
   if (!context) return mediaJson(recipeError("UNAVAILABLE"), 503);
@@ -19,13 +22,13 @@ export async function POST(request: NextRequest) {
     if (!member) return finish(recipeError("UNAUTHENTICATED"), 401);
     const admin = createMediaAdminClient();
     if (!admin) return finish(recipeError("UNAVAILABLE"), 503);
-    const { data: id, error } = await context.supabase.rpc("reserve_recipe_upload", {
-      p_recipe_id: input.recipeId, p_request_id: input.requestId,
-    });
+    const { data: id, error } = await (input.purpose === "review"
+      ? context.supabase.rpc("re_reserve_review_upload", { p_version_id: input.versionId, p_request_id: input.requestId })
+      : context.supabase.rpc("re_reserve_recipe_upload", { p_recipe_id: input.recipeId, p_request_id: input.requestId }));
     if (error) return finish(recipeDbError(error), 400);
     if (!id) return finish(recipeError("INTERNAL_ERROR"), 503);
     const path = `originals/${member.profile_id}/${id}`;
-    const { data, error: signError } = await admin.storage.from("recipe-media").createSignedUploadUrl(path, { upsert: false });
+    const { data, error: signError } = await admin.storage.from("re_recipe_media").createSignedUploadUrl(path, { upsert: false });
     if (signError || !data) return finish(recipeError("INTERNAL_ERROR"), 503);
     return finish({ ok: true, data: { assetId: id, path: data.path, token: data.token } });
   } catch { return finish(recipeError("INTERNAL_ERROR"), 503); }

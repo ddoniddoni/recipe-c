@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getPageViewer } from "@/features/auth/viewer";
 import { MemberNotice } from "@/features/auth/components/member-notice";
 import { MyRecipes } from "@/features/recipes/components/my-recipes";
+import { PersonalCommunity } from "@/features/community/components/personal-community";
 import { parseRecipeSearch } from "@/features/recipes/search";
 
 export const metadata: Metadata = { title: "내 공간" };
@@ -12,6 +13,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<R
   if (viewer.kind !== "member" || !viewer.account.email_verified || viewer.account.status !== "active") {
     return <MemberNotice viewer={viewer} />;
   }
+  const query = await searchParams;
+  const rawTab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
+  const tab = rawTab && ["saved", "reviews", "reports"].includes(rawTab) ? rawTab : "recipes";
+  const page = parseRecipeSearch(query).page;
   const { account } = viewer;
   if (!account.profile_completed) redirect("/settings/profile");
   return <section className="member-page">
@@ -32,10 +37,12 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<R
         <span className="eyebrow">계정</span>
         <h2>이메일과 로그인 관리</h2>
         <p className="account-email">{viewer.email}</p>
-        <p className="muted">이메일 확인을 마쳤어요.</p>
+        <p className="muted">가입한 이메일로 로그인할 수 있어요.</p>
         <Link className="text-link" href="/settings">계정 설정으로</Link>
       </article>
     </div>
-    <MyRecipes page={parseRecipeSearch(await searchParams).page} />
+    <nav className="community-tabs" aria-label="내 공간 메뉴">{[["recipes", "내 레시피"], ["reviews", "내 후기"], ["saved", "저장한 레시피"], ["reports", "신고 접수"]].map(([key, label]) =>
+      <Link key={key} href={`/me?tab=${key}`} aria-current={tab === key ? "page" : undefined}>{label}</Link>)}<Link href="/notifications">알림</Link></nav>
+    {tab === "recipes" ? <MyRecipes page={page} /> : <PersonalCommunity page={page} tab={tab} />}
   </section>;
 }

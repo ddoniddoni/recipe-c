@@ -21,7 +21,7 @@ export async function createRecipeAction(requestId: string): Promise<RecipeResul
   try {
     const supabase = await writer();
     if (!supabase) return recipeError("UNAVAILABLE");
-    const { data, error } = await supabase.rpc("create_recipe_draft", { p_body: emptyRecipeBody(), p_request_id: requestId });
+    const { data, error } = await supabase.rpc("re_create_recipe_draft", { p_body: emptyRecipeBody(), p_request_id: requestId });
     if (error) return recipeDbError(error);
     if (!data) return recipeError("INTERNAL_ERROR");
     revalidatePath("/me");
@@ -39,7 +39,7 @@ export async function saveRecipeAction(input: unknown): Promise<RecipeResult<{ d
     const supabase = await writer();
     if (!supabase) return recipeError("UNAVAILABLE");
     const { recipeId, expectedVersion, body, requestId } = parsed.data;
-    const { data, error } = await supabase.rpc("save_recipe_draft", {
+    const { data, error } = await supabase.rpc("re_save_recipe_draft", {
       p_recipe_id: recipeId, p_expected_version: expectedVersion, p_body: body, p_request_id: requestId,
     });
     if (error) return recipeDbError(error);
@@ -57,7 +57,7 @@ export async function publishRecipeAction(input: unknown): Promise<RecipeResult<
     const supabase = await writer();
     if (!supabase) return recipeError("UNAVAILABLE");
     const { recipeId, expectedVersion, requestId } = parsed.data;
-    const { data, error } = await supabase.rpc("publish_recipe", {
+    const { data, error } = await supabase.rpc("re_publish_recipe", {
       p_recipe_id: recipeId, p_expected_version: expectedVersion, p_request_id: requestId,
     });
     if (error) return recipeDbError(error);
