@@ -19,3 +19,27 @@ export function filterSampleRecipes(
     ).includes(needle),
   );
 }
+
+export type RecipeSearch = { q: string; category: string; maxMinutes: number; difficulty: string; sort: "newest"; page: number };
+export function parseRecipeSearch(params: Record<string, string | string[] | undefined>): RecipeSearch {
+  const single = (key: string) => Array.isArray(params[key]) ? params[key]?.[0] : params[key];
+  const page = Number(single("page") ?? 1);
+  const minutes = Number(single("maxMinutes") ?? 1440);
+  const difficulty = single("difficulty") ?? "";
+  const category = single("category") ?? "";
+  return {
+    q: normalizeSampleQuery(params.q), category: /^[a-z][a-z0-9-]{1,39}$/.test(category) ? category : "",
+    maxMinutes: Number.isInteger(minutes) && minutes > 0 && minutes <= 1440 ? minutes : 1440,
+    difficulty: ["easy", "medium", "hard"].includes(difficulty) ? difficulty : "",
+    sort: "newest", // Review/bookmark sorts arrive with P3's real statistics.
+    page: Number.isInteger(page) ? Math.min(100, Math.max(1, page)) : 1,
+  };
+}
+export function recipeSearchHref(search: RecipeSearch, page: number) {
+  const query = new URLSearchParams({ sort: search.sort, page: String(page) });
+  if (search.q) query.set("q", search.q);
+  if (search.category) query.set("category", search.category);
+  if (search.maxMinutes !== 1440) query.set("maxMinutes", String(search.maxMinutes));
+  if (search.difficulty) query.set("difficulty", search.difficulty);
+  return `/recipes?${query}`;
+}

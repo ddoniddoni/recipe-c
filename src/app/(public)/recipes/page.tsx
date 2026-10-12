@@ -11,16 +11,19 @@ import {
   normalizeSampleQuery,
 } from "@/features/recipes/search";
 import { RecipeCard } from "@/features/recipes/components/recipe-card";
+import { RecipeCatalog } from "@/features/recipes/components/recipe-catalog";
+import { parseRecipeSearch } from "@/features/recipes/search";
 
 export const metadata: Metadata = { title: "레시피 탐색" };
 
 export default async function RecipesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const status = getAppStatus();
-  const query = normalizeSampleQuery((await searchParams).q);
+  const params = await searchParams;
+  const query = normalizeSampleQuery(params.q);
   const recipes = status.demoMode
     ? filterSampleRecipes(getSampleRecipes(), query)
     : [];
@@ -32,7 +35,7 @@ export default async function RecipesPage({
         <p>
           {status.demoMode
             ? "제목이나 재료로 샘플 레시피를 찾아보세요."
-            : "나누고 싶은 요리법을 위한 공간을 준비하고 있어요."}
+            : "제목과 재료로, 오늘 만들고 싶은 요리를 찾아보세요."}
         </p>
       </div>
       {status.demoMode ? (
@@ -84,7 +87,7 @@ export default async function RecipesPage({
             </EmptyState>
           )}
         </>
-      ) : (
+      ) : status.hasSupabaseConfig ? <RecipeCatalog search={parseRecipeSearch(params)} /> : (
         <SetupNotice hasSupabaseConfig={status.hasSupabaseConfig} />
       )}
     </>

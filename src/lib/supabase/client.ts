@@ -7,5 +7,9 @@ import type { Database } from "./database";
 export function createSupabaseBrowserClient() {
   const config = getPublicEnv().supabase;
   if (!config) throw new Error("인증 서비스가 아직 연결되지 않았어요.");
-  return createBrowserClient<Database>(config.url, config.publishableKey);
+  return createBrowserClient<Database>(config.url, config.publishableKey, {
+    global: { fetch: (input, init) => fetch(input, {
+      ...init, signal: init?.signal ?? AbortSignal.timeout(60_000),
+    }) },
+  });
 }

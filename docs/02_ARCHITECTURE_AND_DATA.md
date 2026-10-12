@@ -180,6 +180,10 @@ current_version_id는 다른 레시피의 버전을 가리킬 수 없다. recipe
 
 재료와 조리 단계는 버전 단위로 읽고 수정되므로 JSONB 배열로 시작한다. 사진 공개 여부와 소유권 추적을 위해 asset 참조는 recipe_version_assets에도 유지한다. 버전 생성 함수가 JSONB와 참조 테이블을 같은 트랜잭션에서 생성한다. 클라이언트가 둘을 따로 수정하지 못한다.
 
+P2 구현에서는 `recipe_versions.body`를 검증된 불변 JSONB 원본으로 저장하고 title/summary/servings/prep_minutes/cook_minutes/difficulty를 generated column으로 노출한다. ingredients/steps/tips/tags/disclosureText는 body에서 읽으며, category_id/cover_asset_id는 FK를 위해 따로 저장한다. 발행 RPC가 이 값을 같은 트랜잭션에서 채우고 일반 사용자의 직접 INSERT/UPDATE/DELETE는 허용하지 않는다. 본문 중복 사본을 서로 다른 경로로 수정하지 않는다.
+
+초안 생성에는 계정별 `creation_request_id`, 저장에는 `last_save_request_id`를 추가한다. 같은 저장 요청은 동일 본문과 expectedDraftVersion일 때만 같은 결과를 반환한다. 저장한 초안은 발행 후에도 다음 편집의 출발점으로 유지한다. 발행 hash는 정규화된 텍스트·수량·태그와 이미지 바이트 hash를 사용하며 재료/단계의 UI 식별자와 권리 확인 체크값은 제외한다.
+
 ```typescript
 type Ingredient = {
   id: string;
@@ -198,7 +202,7 @@ type RecipeStep = {
 };
 ```
 
-quantity는 양수이고 최대 소수 3자리다. quantity가 없으면 quantityText가 필요하다. unit과 quantityText의 최대 길이는 각각 20자, 50자다. 정렬 position은 1부터 중복 없이 이어진다. 재료나 단계 ID는 한 버전 안에서 고유해야 한다. JSON 전체는 UTF-8 기준 최대 256KiB로 제한한다.
+quantity는 양수이고 최대 1,000,000, 소수 3자리다. quantity가 없으면 quantityText가 필요하다. unit과 quantityText의 최대 길이는 각각 20자, 50자다. 정렬 position은 1부터 중복 없이 이어진다. 재료나 단계 ID는 한 버전 안에서 고유해야 한다. JSON 전체는 UTF-8 기준 최대 256KiB로 제한한다.
 
 DB 함수는 배열 타입, 요소 수, 필드 타입, 문자열 길이, 인분과 시간, imageAssetId의 소유자 및 ready 상태를 직접 확인한다. Zod를 우회해 RPC를 호출해도 잘못된 자료가 저장되면 안 된다.
 
@@ -268,6 +272,8 @@ P6에서 affiliate_links와 private.affiliate_clicks, sponsor_campaigns를 migra
 필수 인덱스 기본안은 recipes(status,first_published_at DESC,id), recipe_versions(recipe_id,version_no), cook_reviews(recipe_version_id,status), recipe_comments(recipe_id,parent_id,created_at,id), bookmarks(profile_id,created_at), notifications(recipient_id,read_at,created_at), award_entries(period_id,status), award_evaluations(period_id,entry_id,eligibility)다. FK 열과 권한 검사 열도 실행 계획을 보며 보완한다.
 
 목록 정렬의 마지막 조건에 고유 ID를 붙여 페이지 이동 중 동점 순서가 임의로 바뀌지 않게 한다. offset 기반 페이지네이션으로 시작하되 큰 offset은 제한한다. 공개 DB 전체를 브라우저로 가져와 필터링하지 않는다.
+
+P2의 목록은 페이지당 12개, 최대 100페이지다. 현재 발행 버전의 제목·재료를 NFKC/소문자/공백 제거로 정규화한 후 `strpos`로 검색한다. `%`, `_`, 역슬래시를 SQL 패턴으로 해석하지 않는다. 평점·후기 수·저장 수 정렬은 실제 통계를 구현하는 P3에서 추가하며 P2는 `sort=newest`로 정규화한다. 현재 후기/저장 수를 임의로 생성하지 않는다. 공개 목록 view는 `security_invoker=true`, 상세 RPC는 SECURITY INVOKER와 부모 가시성 검사를 사용한다.
 
 ## 8. 권한과 RLS 계약
 
@@ -347,7 +353,11 @@ DB가 차단한 경합 오류는 적절한 코드로 변환한다. 네트워크�
 
 ## 10. 이미지 파이프라인
 
-private 버킷 `recipe-media` 하나로 시작한다. 원본 경로는 `originals/{profileId}/{assetId}`, 처리 결과는 `processed/{profileId}/{assetId}.webp`다. 사용자 파일명을 저장 경로에 직접 사용하지 않는다. Storage의 일반 anon/authenticated 직접 읽기, 삭제, 덮어쓰기는 허용하지 않는다. 업로드는 서버가 발급한 정확한 original 경로의 서명으로만 진행하고 processed 경로에는 업로드 권한을 주지 않는다. 처리된 파일을 덮어쓰지 않으며 콘텐츠 참조가 있는 파일을 사용자가 임의로 삭제하는 API도 제공하지 않는다. public 버킷은 URL 보유자의 읽기를 막지 못하므로 비공개 초안과 신고 이미지에 사용하지 않는다. S08 참고.
+private 버킷 `recipe-media` 하나로 시작한다. 원본 경로는 `originals/{profileId}/{assetId}`, 처리 결과는 `processed/{profileId}/{assetId}/{processingToken}.webp`다. 사용자 파일명을 저장 경로에 직접 사용하지 않는다. Storage의 일반 anon/authenticated 직접 읽기, 삭제, 덮어쓰기는 허용하지 않는다. 업로드는 서버가 발급한 정확한 original 경로의 서명으로만 진행하고 processed 경로에는 업로드 권한을 주지 않는다. 처리된 파일을 덮어쓰지 않으며 콘텐츠 참조가 있는 파일을 사용자가 임의로 삭제하는 API도 제공하지 않는다. public 버킷은 URL 보유자의 읽기를 막지 못하므로 비공개 초안과 신고 이미지에 사용하지 않는다. S08 참고.
+
+P2에서는 처리 잠금이 2분 뒤 만료되며 최대 5번 처리할 수 있다. 시도마다 다른 processingToken 경로를 사용하고 DB 완료 RPC도 현재 토큰을 검사하므로 늦게 끝난 이전 작업이 재시도 결과를 덮어쓰지 않는다. ready 전환 RPC는 service_role에만 실행 권한을 주고 일반 사용자용 reserve/claim RPC는 매번 세션·작성자·레시피 상태를 확인한다. 자산을 레시피 하나에 귀속해 타인 자산뿐 아니라 다른 레시피의 asset ID도 초안 저장/발행에서 거절한다.
+
+원본 삭제가 실패하면 ready 상태는 유지하고 다음 완료 요청에서 정리를 재시도한다. 만료된 업로드 서명은 같은 upload_request_id로 갱신할 수 있다. 원본 업로드 서명은 제공자 기본 유효기간을 따르며, 이미 삭제한 원본 경로에 유효한 서명으로 다시 올린 미참조 파일도 P5 정리 대상이다. 만료된 처리 시도의 고아 출력과 장기간 미참조 원본/ready 자산 정리 작업은 P5에서 추가한다. P2는 성공 응답이 불명확한 출력 파일을 즉시 삭제하지 않는다.
 
 처리 순서는 아래와 같다.
 

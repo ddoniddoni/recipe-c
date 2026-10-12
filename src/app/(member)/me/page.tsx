@@ -3,9 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPageViewer } from "@/features/auth/viewer";
 import { MemberNotice } from "@/features/auth/components/member-notice";
+import { MyRecipes } from "@/features/recipes/components/my-recipes";
+import { parseRecipeSearch } from "@/features/recipes/search";
 
 export const metadata: Metadata = { title: "내 공간" };
-export default async function MyPage() {
+export default async function MyPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await getPageViewer("/me");
   if (viewer.kind !== "member" || !viewer.account.email_verified || viewer.account.status !== "active") {
     return <MemberNotice viewer={viewer} />;
@@ -16,7 +18,7 @@ export default async function MyPage() {
     <header className="page-heading">
       <span className="eyebrow">나의 레시피 노트</span>
       <h1>{account.display_name}님의 공간</h1>
-      <p className="muted">내 소개를 다듬고 계정 정보를 관리하세요.</p>
+      <p className="muted">쓰던 레시피를 이어 쓰고, 나의 요리 기록을 모아 보세요.</p>
     </header>
     <div className="member-grid">
       <article className="member-card">
@@ -34,6 +36,6 @@ export default async function MyPage() {
         <Link className="text-link" href="/settings">계정 설정으로</Link>
       </article>
     </div>
-    <div className="member-coming-soon"><h2>레시피 노트를 준비하고 있어요</h2><p>레시피 작성과 저장 기능은 준비 중이에요. 사용할 수 있게 되면 이곳에서 내 레시피를 모아 볼 수 있어요.</p></div>
+    <MyRecipes page={parseRecipeSearch(await searchParams).page} />
   </section>;
 }

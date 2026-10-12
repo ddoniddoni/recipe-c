@@ -102,7 +102,7 @@ DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과�
 
 사용자는 P1에서 **기존 개발용 Supabase 프로젝트**를 사용하기로 선택했다. 프로젝트 URL/ID와 `.env.local` 연결 값은 아직 확인되지 않았다. 로컬 설정은 선택 가능한 보조 환경으로 준비하되 Docker 실행, 원격 DB 변경, Auth 설정 변경을 수행했다고 간주하지 않는다.
 
-또한 사용자 지시로 **테스트, lint, typecheck, build, audit, React Doctor, DB advisor, 브라우저 검증은 별도 요청까지 실행하지 않는다.** 아래 검증 목록은 향후 재개할 때의 기준이며 이번 구현의 통과 기록이 아니다. 새 P1 테스트 작성도 보류한다.
+또한 사용자 지시로 **테스트, lint, typecheck, build, audit, React Doctor, DB advisor, 브라우저 검증은 별도 요청까지 실행하지 않는다.** 아래 검증 목록은 향후 재개할 때의 기준이며 이번 구현의 통과 기록이 아니다. 새 P1/P2 테스트 작성도 보류한다. Supabase 연결은 사용자가 밤에 재개하기로 했으므로, P2도 로컬 코드와 migration만 작성한다.
 
 ### 기존 개발 프로젝트 연결
 
@@ -115,6 +115,16 @@ DB 타입 생성 스크립트는 `supabase gen types typescript --local` 결과�
 7. DB 적용 후 타입 생성은 `npm run db:types -- --linked`를 사용한다. 현재 `src/lib/supabase/database.ts`는 **수작업으로 작성한 P1 타입 계약**이다. 생성 스크립트는 정상 종료와 Database 타입 출력을 확인한 뒤 이 파일을 원자적으로 교체하며 실패 시 기존 파일을 보존한다. 사용자 요청 전에는 타입 생성이나 검증도 실행하지 않는다.
 
 가입 → 확인 메일 → `/settings/profile` → `/me` 순서로 연결한다. 비밀번호 복구는 `/forgot-password` → 메일 → `/reset-password` → 재로그인이다. `getClaims`로 토큰을 검증하고, 계정 정보/관리자 경로에는 최신 Auth 사용자와 DB 계정 정보를 사용한다. Proxy는 쿠키 갱신과 `private, no-store` 응답 헤더를 함께 전달한다. 요청별 서버 클라이언트를 사용하며 사용자 세션을 전역 캐시에 저장하지 않는다.
+
+### P2 레시피·사진 연결 시 추가할 설정
+
+- P1 다음에 `20261012140254_recipes_media.sql`을 적용한다. 기존 `recipes`, `media_assets`, 관련 함수와 `recipe-media` 버킷이 없는지 먼저 확인한다. 이 migration은 기존 객체를 덮어쓰지 않으며, 현재는 적용하지 않았다.
+- `.env.local`의 `SUPABASE_SECRET_KEY`는 사진 서명·처리·접근에만 서버에서 사용한다. 일반 레시피/초안 쓰기는 사용자 세션의 RPC를 사용한다. 키가 없으면 편집 화면에서 사진 업로드를 안내로 대체하고 텍스트 초안만 저장할 수 있다. 키를 설정했다고 Storage 연결이 확인된 것은 아니다.
+- `recipe-media`는 private, 파일당 5MiB, JPEG/PNG/WebP만 허용한다. migration은 이 버킷에 일반 anon/authenticated 직접 접근을 막는 restrictive Storage 정책을 추가한다. 버킷을 public으로 전환하지 않는다. 서명된 원본 업로드와 서버의 처리 경로 외에는 쓰기 권한을 추가하지 않는다.
+- 업로드 요청 Origin은 `NEXT_PUBLIC_SITE_URL`의 origin과 정확히 일치해야 한다. 브라우저에서 접속한 호스트를 Site URL과 맞춘다. 파일 바이트는 Storage에 직접 전송하며, Next.js sign/complete에는 2KiB 이하 JSON만 받는다.
+- 이미지 처리는 Node 런타임과 Sharp 0.35.5가 필요하다. 호스팅의 요청 시간·메모리 한도를 확인하고 Sharp 출력·픽셀 제한·처리 시간 제한을 실제로 검증한다. EXIF/GPS 제거, APNG/animated WebP·위장 파일 차단, 업로드 중단·서명 만료·처리 경합은 아직 실행 검증하지 않았다.
+- UI는 수동 초안 저장이다. 발행 전에 저장하고 미리보기를 연다. 저장 충돌은 입력을 보존한 채 최신 초안 다시 읽기를 안내하며 자동 덮어쓰기를 하지 않는다. 발행 결과가 불명확하면 같은 request ID로 확인하고, 공개 페이지의 과거 버전 링크는 해당 버전을 유지한다.
+- DB 타입은 여전히 수작업 계약이다. 연결 후 실제 타입 생성과 권한/경합/E2E 검증을 사용자 재개 지시에 맞춰 수행한다. 장기 미참조 파일 및 고아 처리 결과의 자동 정리는 P5 잔여 작업이다.
 
 ### 최초 관리자 지정
 

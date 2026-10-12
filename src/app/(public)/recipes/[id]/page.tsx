@@ -13,15 +13,22 @@ import {
   IngredientList,
   StepList,
 } from "@/features/recipes/components/recipe-content";
+import { PublishedRecipeDetail } from "@/features/recipes/components/published-recipe-detail";
 
-export const metadata: Metadata = { title: "샘플 레시피 상세" };
+export const metadata: Metadata = { title: "레시피 상세" };
 
 export default async function RecipePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ version?: string | string[] }>;
 }) {
   const status = getAppStatus();
+  if (!status.demoMode && status.hasSupabaseConfig) {
+    const [{ id }, query] = await Promise.all([params, searchParams]);
+    return <PublishedRecipeDetail id={id} versionId={Array.isArray(query.version) ? query.version[0] : query.version} />;
+  }
   if (!status.demoMode)
     return (
       <>
