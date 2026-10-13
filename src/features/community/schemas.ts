@@ -35,7 +35,7 @@ export const communitySchema = z.object({ reviews: z.array(reviewSchema), review
   comments: z.array(commentSchema.extend({ replies: z.array(commentSchema), replyCount: z.number() })), commentTotal: z.number() });
 export const reviewListSchema = z.object({ items: z.array(reviewSchema), total: z.number() });
 export const bookmarksSchema = z.object({ items: z.array(z.object({ recipeId: uuidSchema, card: recipeCardSchema.nullable() })), total: z.number() });
-export const notificationsSchema = z.object({ items: z.array(z.object({ id: uuidSchema, type: z.enum(["review", "reply"]),
+export const notificationsSchema = z.object({ items: z.array(z.object({ id: uuidSchema, type: z.enum(["review", "reply", "award"]), awardSlug: z.string().nullable().optional(),
   readAt: z.string().nullable(), createdAt: z.string(), recipeId: uuidSchema.nullable(), versionId: uuidSchema.nullable(),
   entityId: uuidSchema.nullable(), threadId: uuidSchema.nullable() })), total: z.number(), unread: z.number() });
 export const reportsSchema = z.object({ items: z.array(z.object({ id: uuidSchema, reason_code: z.enum(["spam", "abuse", "rights", "unsafe", "other"]),

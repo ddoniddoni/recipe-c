@@ -234,7 +234,7 @@ P3 구현 계약:
 
 - 후기 생성·편집·삭제는 `re_private.re_mutate_cook_review` 한 경로에서 처리한다. `re_upsert_cook_review`와 `re_delete_cook_review`는 사용자 세션의 공개 진입점이다. 삭제 호출도 versionId + expectedRevision + requestId를 받아 본인 행만 처리한다. 삭제 시 본문/별점을 비우고 사진 참조를 제거하며 행과 revision은 유지한다. 다시 작성하면 같은 행을 복원하고 최초 생성 알림을 재발송하지 않는다.
 - 후기와 댓글은 last_request_id 및 입력 hash로 같은 요청의 재시도를 처리한다. 댓글은 클라이언트가 생성한 고정 UUID를 식별자로 쓰되 소유자는 DB 세션에서 정한다. 기존 댓글의 레시피·부모는 바꿀 수 없다. 정상 클라이언트가 기대한 revision과 DB가 다르면 CONFLICT다. 다른 화면 동작의 새로고침이 작성 중인 글을 덮어쓰지 않도록 편집 기준 revision을 유지한다.
-- 쓰기 잠금 순서는 계정 → 레시피 → 후기/댓글 → 정렬된 사진 ID다. 계정 잠금으로 같은 사용자의 요청과 호출 제한을 직렬화한다. P4는 후기 변경 함수 내부에 행사 ID 순 잠금, 잠금 후 서버 시각 검사, snapshot/source_revision 갱신을 추가해야 한다. P3에 가짜 월간 평가 기록이나 성공 stub을 만들지 않았다.
+- 쓰기 잠금 순서는 계정 → 레시피 → 후기/댓글 → 정렬된 사진 ID다. 계정 잠금으로 같은 사용자의 요청과 호출 제한을 직렬화한다. P4 migration은 후기 변경 함수에서 공개 행사 ID 순 잠금을 계정 잠금보다 먼저 얻고, 마지막 필요한 잠금/호출 제한 처리 후 실제 서버 시각으로 snapshot/source_revision을 갱신한다. P3에 가짜 월간 평가 기록이나 성공 stub을 만들지 않았다.
 - 후기/댓글은 공개 부모의 상태와 작성자 공개 자격을 함께 확인한다. deleted 원댓글은 비운 본문의 자리표시자로 남기고 답글을 읽을 수 있지만 hidden 부모의 답글은 공개하지 않는다. 신고나 알림에도 숨겨진 본문 사본을 보관하지 않는다.
 - 북마크 행/알림/신고 접수 상태는 본인에게만 SELECT를 허용한다. 북마크 총수만 좁은 private 함수로 공개하며 저장한 사람의 목록은 반환하지 않는다. 일반 사용자의 직접 테이블 쓰기는 revoke하고 좁은 RPC만 허용한다.
 - `re_get_recipe_community`는 후기 12개, 최상위 댓글 12개를 페이지로 반환한다. 기본 답글은 스레드당 3개이며 `thread` 선택 시 12개씩 읽는다. 페이지는 최대 100이다. 내 후기 목록은 공개 부모의 본인 published/hidden/deleted 기록을 보여 주고, 공개 프로필에는 published 후기만 반환한다.
@@ -247,20 +247,26 @@ P3 구현 계약:
 
 | 테이블 | 주요 필드 | 제약 및 비고 |
 |---|---|---|
-| re_award_periods | id, slug, kind, month_key, title, theme, submission_opens_at, submission_closes_at, voting_opens_at, voting_closes_at, finalize_not_before, state, rules, source_revision, final_run_id, created_by | slug UQ, kind=monthly/sponsored, 첫 베타는 monthly만 생성 |
+| re_award_periods | id, slug, kind, month_key, title, theme, submission_opens_at, submission_closes_at, voting_opens_at, voting_closes_at, finalize_not_before, state, rules, source_revision, final_run_id, created_by | slug UQ, P4는 kind=monthly만 허용, sponsored는 P6의 별도 확장 |
 | re_award_entries | id, period_id, recipe_id, recipe_version_id, author_id, status, submitted_at | UQ(period_id,recipe_id), UQ(period_id,author_id), 출품 버전 고정 |
 | re_award_evaluations | id, period_id, entry_id, reviewer_id, review_id, rating_snapshot, eligibility, evaluated_at, updated_at | UQ(entry_id,reviewer_id), UQ(period_id,review_id), 내부 평가 자료 |
-| re_award_runs | id, period_id, source_revision, input_hash, rules_snapshot, status, prepared_at, finalized_at, idempotency_key | UQ(period_id,idempotency_key), status=prepared/finalized/superseded |
-| re_private.re_award_run_inputs | run_id, evaluation_id, entry_id, rating, included, exclusion_code | 집계에 사용한 최소 입력 스냅샷, 후기 본문과 사진 복제 금지 |
-| re_award_results | run_id, entry_id, recipe_id, recipe_version_id, author_id, rank, medal, review_count, rating_sum, five_star_count, raw_average, adjusted_score, visibility_status | PK(run_id,entry_id), 수상하지 않은 적격 후보 결과도 보존 |
+| re_award_runs | id, period_id, source_revision, input_hash, result_hash, rules_snapshot, status, prepared_at, finalized_at, idempotency_key | UQ(period_id,idempotency_key), P4 status=prepared/finalized |
+| re_private.re_award_run_inputs | run_id, manifest | run_id PK, 후보/평가 ID·rating·포함/제외 사유를 정렬한 JSONB 최소 입력. 후기 본문/사진 복제 금지 |
+| re_award_results | run_id, entry_id, recipe_id, recipe_version_id, author_id, rank, medal, review_count, rating_sum, five_star_count, raw_average, adjusted_score, visibility | PK(run_id,entry_id), 수상하지 않은 적격 후보 결과도 보존 |
 
 month_key는 일반 월간 행사의 해당 월 1일을 나타내는 DATE다. monthly에는 필수이고 sponsored에는 NULL이다. 취소되지 않은 monthly 행사에 대해 month_key의 부분 UNIQUE 인덱스를 두어 같은 달 일반 행사를 중복 생성하지 않는다. source_revision은 0부터 시작하는 BIGINT다. 최초 베타 일정은 접수 시작 < 접수 마감 = 평가 시작 < 평가 종료 <= 확정 가능 시각을 DB에서 검증한다.
 
-award_results의 medal은 gold/silver/bronze/NULL이고, visibility_status는 visible/content_removed/revoked다. 순위는 양의 정수이며 공동순위를 허용한다. 콘텐츠 삭제는 점수를 고쳐 쓰지 않고 content_removed 상태로 표시 내용을 제한한다.
+award_results의 medal은 gold/silver/bronze/NULL이고, 어워즈 결과의 visibility는 visible/content_removed/revoked다. 순위는 양의 정수이며 공동순위를 허용한다. 콘텐츠 삭제는 점수를 고쳐 쓰지 않고 content_removed 상태로 표시 내용을 제한한다.
 
 rules는 규칙 버전, 최소 후기 수, 보정 파라미터, 계정 최소 경과 시간, 동점 규칙 등을 포함한 검증된 JSONB다. 행사 공개 후 규칙과 일정은 임의 변경하지 않는다. 상세 상태와 스냅샷 변경 규칙은 03 문서를 따른다.
 
 award_entries의 author_id는 recipes.author_id와 일치해야 한다. period_id와 entry_id의 일치, 평가자의 review 소유권, review의 출품 버전 일치는 모두 DB 함수 및 복합 제약으로 검증한다. 관리자도 표의 점수 열을 직접 편집하는 UI를 갖지 않는다.
+
+P4의 어워즈 테이블은 RLS와 직접 테이블 접근 거부를 사용한다. 공개 읽기 `re_get_awards`는 공개 행사/출품 버전과 확정 run만, `re_get_review_award_context`는 공개 행사와 본인의 평가 상태만 반환한다. `re_get_admin_awards`는 실제 관리자 세션을 확인한 뒤 준비된 집계와 제외 사유를 페이지 단위로 반환한다. 내부 판단 근거는 private audit에만 기록한다. 쓰기 `re_award_command`는 고정된 operation 목록을 검사하며 사용자 입력으로 임의 SQL/RPC를 실행하지 않는다.
+
+집계 manifest는 run 한 행에 정규화된 최소 JSONB로 저장해 규칙과 함께 해시를 만든다. 후기 없는 출품작과 제외 평가도 남긴다. 결과 해시를 별도로 저장하고 확정 시 현재 revision, 규칙, 자격 fingerprint, 저장 manifest와 결과의 무결성을 확인한다. 임의 재계산 없이 변경된 입력은 새 prepare를 요구한다. 관리자 목록은 12개/페이지, 최대 100페이지로 기존 앱 계약을 따른다.
+
+P5에서 추가할 숨김/탈퇴/계정 운영 경로도 반드시 행사 ID 순 잠금 → 계정/콘텐츠 잠금 및 같은 트랜잭션의 source_revision 증가를 따라야 한다. 공유 Auth의 외부 상태 변경은 준비 시점의 현재 자격 fingerprint와 확정 시점의 fingerprint로 추가 감지하지만, 공유 프로젝트 외부 운영 전체를 이 앱이 통제하지는 않는다.
 
 ### 6.5 이미지와 운영 데이터
 

@@ -1,3 +1,4 @@
+import { AwardBadges } from "@/features/awards/components/award-integrations";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -27,6 +28,7 @@ export default async function PublicProfilePage({ params, searchParams }: { para
   return <section className="member-page">
     <header className="page-heading"><span className="eyebrow">요리사 프로필</span><h1>{data.display_name}</h1><p className="muted">@{data.handle}</p></header>
     <article className="member-card"><h2>짧은 소개</h2><p className="profile-bio">{data.bio || "아직 소개를 작성하지 않았어요."}</p></article>
+    <AwardBadges authorId={data.id} />
     <section className="section-space"><h2>공개 레시피</h2>
       {recipes?.items.length ? <div className="recipe-grid">{recipes.items.map((recipe) => <PublishedRecipeCard key={recipe.id} recipe={recipe} />)}</div>
         : <EmptyState title="아직 공개한 레시피가 없어요"><p>레시피가 발행되면 이곳에서 볼 수 있어요.</p></EmptyState>}

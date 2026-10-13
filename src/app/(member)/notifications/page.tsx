@@ -25,11 +25,11 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       const href = `/recipes/${n.recipeId}?${query}#${n.type === "review" ? "reviews" : "comments"}`;
       return <li key={n.id} className="community-entry" data-unread={!n.readAt}>
         <span className="eyebrow">{n.readAt ? "읽음" : "새 알림"}</span>
-        {n.recipeId ? <Link className="text-link" href={href}>{n.type === "review" ? "내 레시피에 요리 사진 후기가 도착했어요." : "내 댓글에 답글이 달렸어요."}</Link>
+        {n.type === "award" && n.awardSlug ? <Link className="text-link" href={`/awards/${n.awardSlug}`}>월간 어워즈 수상 결과가 발표됐어요.</Link> : n.recipeId ? <Link className="text-link" href={href}>{n.type === "review" ? "내 레시피에 요리 사진 후기가 도착했어요." : "내 댓글에 답글이 달렸어요."}</Link>
           : <p>더 이상 볼 수 없는 게시물의 알림이에요.</p>}
         <time dateTime={n.createdAt}>{new Date(n.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</time>
       </li>;
-    })}</ul> : <EmptyState title="아직 도착한 알림이 없어요"><p>내 레시피에 후기가 등록되거나 내 댓글에 답글이 달리면 알려 드려요.</p></EmptyState>}
+    })}</ul> : <EmptyState title="아직 도착한 알림이 없어요"><p>내 레시피에 후기가 등록되거나 내 댓글에 답글이 달리거나 어워즈에서 수상하면 알려 드려요.</p></EmptyState>}
     <Pagination page={page} total={data?.total ?? 0} href={(p) => `/notifications?page=${p}`} />
   </section>;
 }

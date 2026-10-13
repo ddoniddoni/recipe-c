@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewAwardNotice } from "@/features/awards/components/award-integrations";
 import { getServerEnv } from "@/lib/env/server";
 import type { Viewer } from "@/features/auth/viewer";
 import type { RecipeDetail } from "@/features/recipes/schemas";
@@ -38,6 +39,7 @@ export async function RecipeCommunity({ recipe, viewer, search }: { recipe: Reci
       <div className="section-heading"><div><p className="eyebrow">한 끼를 만들어 본 이야기</p><h2 id="reviews-title">요리 사진 후기</h2></div></div>
       <div className="review-summary"><strong>{card.averageRating === null ? "아직 후기가 없어요" : `★ ${card.averageRating.toFixed(1)} / 5`}</strong>
         <span>v{card.versionNo} · 후기 {card.reviewCount}개</span><p>다른 버전의 별점은 이 평균에 섞이지 않아요.</p></div>
+      <ReviewAwardNotice versionId={card.versionId} />
       {viewerId === card.authorId ? <p className="version-notice">내 레시피에는 별점 후기를 남길 수 없어요. 아래 댓글에서 이야기를 나눠 주세요.</p>
         : viewerId ? <ReviewEditor key={card.versionId} recipeId={card.id} versionId={card.versionId} versionNo={card.versionNo}
           review={data.ownReview} canUpload={Boolean(getServerEnv().secretKey)} />

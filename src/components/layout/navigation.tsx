@@ -8,6 +8,7 @@ export function Navigation({ mobile = false, showAccount = false }: { mobile?: b
   const items = [
     { href: "/", label: "홈" },
     { href: "/recipes", label: "레시피 탐색" },
+    { href: "/awards", label: "어워즈" },
     ...(mobile && showAccount ? [{ href: "/recipes/new", label: "쓰기" }] : []),
     ...(showAccount ? [{ href: "/me", label: "내 공간" }] : []),
   ];
