@@ -1,4 +1,4 @@
-// Hand-maintained P1/P2/P3 contract, not introspected from a running database.
+// Hand-maintained P1/P2/P3/P4 contract, not introspected from a running database.
 // `npm run db:types` replaces this file only after successful local generation.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 export type Profile = {
@@ -50,6 +50,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      re_award_command: { Args: { p_input: Json }; Returns: Json };
+      re_get_awards: { Args: { p_slug?: string; p_page?: number; p_author?: string; p_recipe?: string; p_own_page?: number }; Returns: Json };
+      re_get_review_award_context: { Args: { p_version: string }; Returns: Json };
+      re_get_admin_awards: { Args: { p_period?: string; p_page?: number; p_run?: string }; Returns: Json };
       re_consume_signup_limit: { Args: { p_email_hash: string }; Returns: boolean };
       re_ensure_account: { Args: Record<string, never>; Returns: string };
       re_get_my_account: { Args: Record<string, never>; Returns: Account[] };

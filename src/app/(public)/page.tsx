@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeAwards } from "@/features/awards/components/award-integrations";
 import { getAppStatus } from "@/lib/env/server";
 import { SetupNotice } from "@/components/layout/setup-notice";
 import { getSampleRecipes } from "@/features/recipes/fixtures.server";
@@ -39,14 +40,7 @@ export default function HomePage() {
           <span className="note-signature">당신의 식탁에서 시작해요.</span>
         </aside>
       </section>
-      <section className="awards-notice" aria-labelledby="awards-title">
-        <span className="eyebrow">월간 어워즈</span>
-        <div>
-          <h2 id="awards-title">첫 어워즈를 준비하고 있어요</h2>
-          <p>일정과 참여 규칙이 정해지면 안내할게요.</p>
-        </div>
-        <span className="status-pill">준비 중</span>
-      </section>
+      <HomeAwards />
       {status.demoMode ? (
         <section className="section-space" aria-labelledby="recipes-title">
           <div className="section-heading">

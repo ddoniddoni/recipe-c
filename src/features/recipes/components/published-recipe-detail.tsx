@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { AwardBadges } from "@/features/awards/components/award-integrations";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/features/auth/viewer";
@@ -38,6 +39,7 @@ export async function PublishedRecipeDetail({ id, versionId, communitySearch }: 
       <button type="submit" className="button button--secondary">선택한 버전 보기</button>
     </form>
     {body.disclosureText ? <p className="disclosure-note">작성자가 밝힌 경제적 관계: {body.disclosureText}</p> : null}
+    <AwardBadges recipeId={id} />
     <RecipeReading key={card.versionId} body={body} />
     {body.tags.length ? <ul className="recipe-tags" aria-label="레시피 태그">{body.tags.map((tag) => <li key={tag}>#{tag}</li>)}</ul> : null}
     <RecipeCommunity recipe={recipe} viewer={viewer} search={communitySearch} />

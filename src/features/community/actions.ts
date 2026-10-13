@@ -47,6 +47,7 @@ export async function communityAction(input: unknown): Promise<RecipeResult<Json
     if (result.error) return failure(Object.hasOwn(messages, result.error.message) ? result.error.message : "INTERNAL_ERROR");
     if (result.data === null) return failure("INTERNAL_ERROR");
     revalidatePath("/me"); revalidatePath("/notifications");
+    if (p.operation === "review" || p.operation === "deleteReview") { revalidatePath("/awards/[slug]", "page"); revalidatePath("/admin/awards"); }
     if ("recipeId" in p) {
       revalidatePath(`/recipes/${p.recipeId}`); revalidatePath("/recipes"); revalidatePath("/"); revalidatePath("/u/[handle]", "page");
     }
